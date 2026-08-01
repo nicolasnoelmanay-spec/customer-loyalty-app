@@ -1,19 +1,4 @@
-/**
- * Admin authentication configuration.
- * Swap for server-side auth or environment variables in production.
- */
+/** Default staff username seeded in the database. */
 export const authConfig = {
-  username: "admin",
-  password: "admin",
-  storageKey: "loyalty-admin-auth",
+  defaultUsername: "admin",
 } as const;
-
-export function validateAdminCredentials(
-  username: string,
-  password: string
-): boolean {
-  return (
-    username.trim() === authConfig.username &&
-    password === authConfig.password
-  );
-}

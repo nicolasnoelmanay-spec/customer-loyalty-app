@@ -1,5 +1,4 @@
 import "dotenv/config";
-import bcrypt from "bcryptjs";
 import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
 import { PrismaClient } from "../src/generated/prisma/client.js";
 
@@ -8,14 +7,11 @@ const adapter = new PrismaBetterSqlite3({ url: connectionString });
 const prisma = new PrismaClient({ adapter });
 
 async function main() {
-  const passwordHash = await bcrypt.hash("admin", 10);
-
   await prisma.staff.upsert({
     where: { username: "admin" },
-    update: { passwordHash },
+    update: {},
     create: {
       username: "admin",
-      passwordHash,
       name: "Admin",
     },
   });
