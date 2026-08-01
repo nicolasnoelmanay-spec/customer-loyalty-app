@@ -27,10 +27,28 @@ function readEnvValue(filePath, key) {
 const sourceUrl =
   process.env.SOURCE_DATABASE_URL?.trim() ??
   readEnvValue(".env", "DATABASE_URL");
-const targetUrl =
-  process.env.TARGET_DATABASE_URL?.trim() ??
-  readEnvValue(".env.production.local", "DATABASE_URL") ??
-  process.env.DATABASE_URL_PRODUCTION?.trim();
+function resolveTargetUrl() {
+  const fromFile = readEnvValue(".env.production.local", "DATABASE_URL");
+  if (fromFile?.startsWith("postgres") && fromFile !== "[SENSITIVE]") {
+    return fromFile;
+  }
+
+  const explicit =
+    process.env.TARGET_DATABASE_URL?.trim() ??
+    process.env.DATABASE_URL_PRODUCTION?.trim();
+  if (explicit?.startsWith("postgres")) {
+    return explicit;
+  }
+
+  const fromProcess = process.env.DATABASE_URL?.trim();
+  if (fromProcess?.startsWith("postgres")) {
+    return fromProcess;
+  }
+
+  return undefined;
+}
+
+const targetUrl = resolveTargetUrl();
 
 if (!sourceUrl?.startsWith("postgres")) {
   console.error("Local DATABASE_URL not found in .env.");
@@ -39,7 +57,7 @@ if (!sourceUrl?.startsWith("postgres")) {
 
 if (!targetUrl?.startsWith("postgres")) {
   console.error(
-    "Production DATABASE_URL not found. Run: npx vercel env pull .env.production.local --environment=production"
+    "Production DATABASE_URL not found. Run: npx vercel env run production -- node scripts/sync-neon.mjs"
   );
   process.exit(1);
 }
