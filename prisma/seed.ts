@@ -1,18 +1,23 @@
 import "dotenv/config";
+import bcrypt from "bcryptjs";
 import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
 import { PrismaClient } from "../src/generated/prisma/client.js";
+import { authConfig, getDefaultAdminPassword } from "../src/config/auth";
 
 const connectionString = process.env.DATABASE_URL ?? "file:./prisma/dev.db";
 const adapter = new PrismaBetterSqlite3({ url: connectionString });
 const prisma = new PrismaClient({ adapter });
 
 async function main() {
+  const passwordHash = await bcrypt.hash(getDefaultAdminPassword(), 12);
+
   await prisma.staff.upsert({
-    where: { username: "admin" },
-    update: {},
+    where: { username: authConfig.defaultUsername },
+    update: { passwordHash },
     create: {
-      username: "admin",
-      name: "Admin",
+      username: authConfig.defaultUsername,
+      passwordHash,
+      name: authConfig.defaultName,
     },
   });
 

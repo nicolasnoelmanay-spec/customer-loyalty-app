@@ -19,7 +19,7 @@ interface AuthContextValue {
   isReady: boolean;
   isAuthenticated: boolean;
   staff: StaffUser | null;
-  login: (username: string) => Promise<boolean>;
+  login: (username: string, password: string) => Promise<boolean>;
   logout: () => Promise<void>;
 }
 
@@ -36,9 +36,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .finally(() => setIsReady(true));
   }, []);
 
-  const login = useCallback(async (username: string) => {
+  const login = useCallback(async (username: string, password: string) => {
     try {
-      const session = await loginStaff(username);
+      const session = await loginStaff(username, password);
       setStaff(session);
       return true;
     } catch {

@@ -22,6 +22,7 @@ export default function LoginPage() {
   const router = useRouter();
   const { isReady, isAuthenticated, login } = useAuth();
   const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -33,11 +34,11 @@ export default function LoginPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
-    const success = await login(username);
+    const success = await login(username, password);
     if (success) {
       router.replace("/dashboard");
     } else {
-      setError("Unknown username.");
+      setError("Invalid username or password.");
     }
   }
 
@@ -69,6 +70,17 @@ export default function LoginPage() {
                   onChange={(e) => setUsername(e.target.value)}
                   placeholder="admin"
                   autoComplete="username"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  autoComplete="current-password"
                 />
               </div>
               {error && <p className="text-sm text-destructive">{error}</p>}

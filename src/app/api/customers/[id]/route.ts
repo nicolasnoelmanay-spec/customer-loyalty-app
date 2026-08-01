@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { requireStaffSession } from "@/lib/auth/staff-session";
-import { handleRouteError, jsonError, jsonResponse } from "@/lib/api/route-utils";
+import { ensureDbReady, handleRouteError, jsonError, jsonResponse } from "@/lib/api/route-utils";
 import { getPrismaLoyaltyRepository } from "@/lib/data/prisma-repository";
 import type { UpdateCustomerInput } from "@/types";
 
@@ -9,6 +9,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    await ensureDbReady();
     await requireStaffSession();
     const { id } = await params;
     const body = (await request.json()) as Omit<UpdateCustomerInput, "customerId">;

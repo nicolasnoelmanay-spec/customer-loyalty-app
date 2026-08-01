@@ -8,10 +8,11 @@ datasource db {
 }
 
 model Staff {
-  id        String   @id @default(cuid())
-  username  String   @unique
-  name      String?
-  createdAt DateTime @default(now())
+  id           String   @id @default(cuid())
+  username     String   @unique
+  passwordHash String
+  name         String?
+  createdAt    DateTime @default(now())
 }
 
 model Customer {

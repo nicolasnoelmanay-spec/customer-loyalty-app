@@ -1,4 +1,9 @@
 import { NextResponse } from "next/server";
+import { ensureDatabaseInitialized } from "@/lib/db/initialize-database";
+
+export async function ensureDbReady() {
+  await ensureDatabaseInitialized();
+}
 
 export function jsonError(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status });

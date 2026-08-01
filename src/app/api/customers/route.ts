@@ -1,11 +1,12 @@
 import { NextRequest } from "next/server";
 import { requireStaffSession } from "@/lib/auth/staff-session";
-import { handleRouteError, jsonError, jsonResponse } from "@/lib/api/route-utils";
+import { ensureDbReady, handleRouteError, jsonError, jsonResponse } from "@/lib/api/route-utils";
 import { getPrismaLoyaltyRepository } from "@/lib/data/prisma-repository";
 import type { CreateCustomerInput } from "@/types";
 
 export async function POST(request: NextRequest) {
   try {
+    await ensureDbReady();
     await requireStaffSession();
     const input = (await request.json()) as CreateCustomerInput;
 

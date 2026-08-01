@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { requireStaffSession } from "@/lib/auth/staff-session";
-import { handleRouteError, jsonResponse } from "@/lib/api/route-utils";
+import { ensureDbReady, handleRouteError, jsonResponse } from "@/lib/api/route-utils";
 import { getPrismaLoyaltyRepository } from "@/lib/data/prisma-repository";
 import type { RedeemFreeDrinkVoucherInput } from "@/types";
 
@@ -9,6 +9,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    await ensureDbReady();
     await requireStaffSession();
     const { id } = await params;
     const body = (await request.json()) as Omit<
