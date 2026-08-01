@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { loyaltyConfig } from "@/config/loyalty";
 import { CustomerAccountDetails } from "@/components/customer/customer-account-details";
+import { CustomerProfileForm } from "@/components/customer/customer-profile-form";
 import { Button } from "@/components/ui/button";
 import { useCustomerAuth } from "@/hooks/use-customer-auth";
 
@@ -46,6 +47,7 @@ export function CustomerAccountPage() {
           Sign Out
         </Button>
       </div>
+      <CustomerProfileForm customer={customer} />
       <CustomerAccountDetails customer={customer} transactions={transactions} />
     </div>
   );

@@ -23,7 +23,12 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatTemperatureLabel } from "@/lib/data/drink-temperature";
-import { formatCurrency } from "@/lib/data/purchase-calculations";
+import {
+  calculateCheckoutTotal,
+  calculateProductPointsEarned,
+  formatCurrency,
+  getUnitPrice,
+} from "@/lib/data/purchase-calculations";
 import { fetchCompletedOrders, fetchProducts } from "@/lib/api/loyalty-client";
 import {
   COMPLETED_ORDER_PERIODS,
@@ -42,7 +47,24 @@ import {
 import { formatTransactionDate } from "@/lib/format-date";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
-import type { CompletedOrder, Product } from "@/types";
+import type { CompletedOrder, Product, PurchaseItemInput } from "@/types";
+
+function cartProductsFromItems(items: PurchaseItemInput[], products: Product[]) {
+  return items.flatMap((item) => {
+    const product = products.find((entry) => entry.id === item.productId);
+    if (!product) return [];
+    return [{ product, quantity: item.quantity, temperature: item.temperature }];
+  });
+}
+
+function computeOrderCheckout(order: CompletedOrder, products: Product[]) {
+  const cartProducts = cartProductsFromItems(order.items, products);
+  return calculateCheckoutTotal(
+    order.subtotal,
+    cartProducts,
+    order.voucherToApply
+  );
+}
 
 function computeOrderStats(orders: CompletedOrder[]) {
   const customerIds = new Set<string>();
@@ -362,7 +384,10 @@ export function CompletedOrdersContent() {
             </Card>
           ) : (
           <div className="grid gap-4">
-          {filteredOrders.map((order) => (
+          {filteredOrders.map((order) => {
+            const checkout = computeOrderCheckout(order, products);
+
+            return (
             <Card key={order.id}>
               <CardHeader className="gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="space-y-1">
@@ -383,39 +408,82 @@ export function CompletedOrdersContent() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  {order.items.map((item, index) => (
-                    <div
-                      key={`${order.id}-${item.productId}-${item.temperature ?? "snack"}-${index}`}
-                      className="flex items-center justify-between rounded-lg border bg-muted/30 px-3 py-2 text-sm"
-                    >
-                      <span>
-                        {item.quantity} × {productName(item.productId)}
-                        {item.temperature
-                          ? ` · ${formatTemperatureLabel(item.temperature)}`
-                          : ""}
-                      </span>
-                    </div>
-                  ))}
+                  {order.items.map((item, index) => {
+                    const product = products.find(
+                      (entry) => entry.id === item.productId
+                    );
+                    if (!product) {
+                      return (
+                        <div
+                          key={`${order.id}-${item.productId}-${index}`}
+                          className="rounded-lg border bg-muted/30 px-3 py-2 text-sm"
+                        >
+                          {item.quantity} × {productName(item.productId)}
+                        </div>
+                      );
+                    }
+
+                    const unitPrice = getUnitPrice(product, item.temperature);
+                    const lineTotal = unitPrice * item.quantity;
+                    const linePoints = calculateProductPointsEarned(
+                      product,
+                      item.quantity,
+                      item.temperature
+                    );
+
+                    return (
+                      <div
+                        key={`${order.id}-${item.productId}-${item.temperature ?? "snack"}-${index}`}
+                        className="flex items-start justify-between gap-3 rounded-lg border bg-muted/30 px-3 py-2 text-sm"
+                      >
+                        <div>
+                          <p className="font-medium">
+                            {product.name}
+                            {item.temperature
+                              ? ` · ${formatTemperatureLabel(item.temperature)}`
+                              : ""}
+                          </p>
+                          <p className="text-muted-foreground">
+                            {item.quantity} × {formatCurrency(unitPrice)}
+                          </p>
+                          {linePoints > 0 && (
+                            <p className="text-xs text-emerald-600 dark:text-emerald-400">
+                              +{linePoints} point{linePoints !== 1 ? "s" : ""}
+                            </p>
+                          )}
+                        </div>
+                        <p className="font-medium">{formatCurrency(lineTotal)}</p>
+                      </div>
+                    );
+                  })}
                 </div>
 
-                <div className="rounded-lg border bg-muted/30 px-3 py-3 text-sm space-y-1">
+                <div className="rounded-lg border bg-muted/30 px-3 py-3 text-sm space-y-2">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Subtotal</span>
-                    <span>{formatCurrency(order.subtotal)}</span>
+                    <span className="font-medium">
+                      {formatCurrency(order.subtotal)}
+                    </span>
                   </div>
                   {order.discount > 0 && (
                     <div className="flex justify-between text-indigo-700 dark:text-indigo-300">
-                      <span>Voucher discount</span>
-                      <span>−{formatCurrency(order.discount)}</span>
+                      <span>{checkout.discountLabel ?? "Voucher discount"}</span>
+                      <span className="font-medium">
+                        −{formatCurrency(order.discount)}
+                      </span>
                     </div>
                   )}
-                  <div className="flex justify-between border-t pt-2 font-semibold">
-                    <span>Total</span>
-                    <span>{formatCurrency(order.total)}</span>
+                  <div className="flex justify-between border-t pt-2">
+                    <span className="font-semibold">Total</span>
+                    <span className="text-base font-semibold">
+                      {formatCurrency(order.total)}
+                    </span>
                   </div>
-                  <div className="flex justify-between text-muted-foreground">
+                  <div className="flex justify-between border-t pt-2 text-muted-foreground">
                     <span>Points awarded</span>
-                    <span>+{order.pointsEarned}</span>
+                    <span className="font-medium text-emerald-600 dark:text-emerald-400">
+                      +{order.pointsEarned}
+                    </span>
                   </div>
                 </div>
 
@@ -435,7 +503,8 @@ export function CompletedOrdersContent() {
                 )}
               </CardContent>
             </Card>
-          ))}
+            );
+          })}
           </div>
           )}
         </>

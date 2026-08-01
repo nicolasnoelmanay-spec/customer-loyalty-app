@@ -54,12 +54,6 @@ export function CustomerAccountDetails({
           </div>
           <div className="rounded-lg border bg-muted/30 px-4 py-3 text-sm space-y-1 text-left">
             <p>
-              <span className="text-muted-foreground">Phone:</span> {customer.phone}
-            </p>
-            <p>
-              <span className="text-muted-foreground">Email:</span> {customer.email}
-            </p>
-            <p>
               <span className="text-muted-foreground">Total earned:</span>{" "}
               {customer.totalPointsEarned.toLocaleString()} points
             </p>

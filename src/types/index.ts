@@ -56,6 +56,13 @@ export interface UpdateCustomerInput {
   points: number;
 }
 
+export interface UpdateCustomerProfileInput {
+  customerId: string;
+  name: string;
+  phone: string;
+  email: string;
+}
+
 export interface LogPurchaseInput {
   customerId: string;
   drinkCount?: number;

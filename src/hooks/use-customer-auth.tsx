@@ -13,6 +13,7 @@ import {
   apiCustomerLogout,
   apiGetCustomerAccount,
   apiGetCustomerSession,
+  apiUpdateCustomerProfile,
 } from "@/lib/api/customer-auth-client";
 import type { Customer, Transaction } from "@/types";
 
@@ -21,9 +22,15 @@ interface CustomerAuthContextValue {
   isAuthenticated: boolean;
   customer: Customer | null;
   transactions: Transaction[];
+  totalVoucherSavings: number;
   login: (username: string, password: string) => Promise<boolean>;
   logout: () => Promise<void>;
   refreshAccount: () => Promise<void>;
+  updateProfile: (input: {
+    name: string;
+    phone: string;
+    email: string;
+  }) => Promise<Customer>;
 }
 
 const CustomerAuthContext = createContext<CustomerAuthContextValue | null>(
@@ -35,16 +42,19 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
   const [isReady, setIsReady] = useState(false);
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [totalVoucherSavings, setTotalVoucherSavings] = useState(0);
 
   const refreshAccount = useCallback(async () => {
     try {
       const account = await apiGetCustomerAccount();
       setCustomer(account.customer);
       setTransactions(account.transactions);
+      setTotalVoucherSavings(account.totalVoucherSavings);
       setIsAuthenticated(true);
     } catch {
       setCustomer(null);
       setTransactions([]);
+      setTotalVoucherSavings(0);
       setIsAuthenticated(false);
     }
   }, []);
@@ -93,9 +103,20 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
     } finally {
       setCustomer(null);
       setTransactions([]);
+      setTotalVoucherSavings(0);
       setIsAuthenticated(false);
     }
   }, []);
+
+  const updateProfile = useCallback(
+    async (input: { name: string; phone: string; email: string }) => {
+      const result = await apiUpdateCustomerProfile(input);
+      setCustomer(result.customer);
+      setTotalVoucherSavings(result.totalVoucherSavings);
+      return result.customer;
+    },
+    []
+  );
 
   return (
     <CustomerAuthContext.Provider
@@ -104,9 +125,11 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
         isAuthenticated,
         customer,
         transactions,
+        totalVoucherSavings,
         login,
         logout,
         refreshAccount,
+        updateProfile,
       }}
     >
       {children}

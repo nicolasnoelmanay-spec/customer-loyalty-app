@@ -20,6 +20,7 @@ import type {
   RedeemVoucherInput,
   Transaction,
   UpdateCustomerInput,
+  UpdateCustomerProfileInput,
 } from "@/types";
 import { generateId, normalizeContact } from "./loyalty-calculations";
 import {
@@ -277,6 +278,41 @@ export async function updateCustomer(
 
   const results = await sql.transaction(queries);
   return mapCustomer((results[0] as CustomerRow[])[0] as CustomerRow);
+}
+
+export async function updateCustomerProfile(
+  input: UpdateCustomerProfileInput
+): Promise<Customer> {
+  const existing = await getCustomerRow(input.customerId);
+  if (!existing) throw new Error("Customer not found");
+
+  const name = input.name.trim();
+  const phone = input.phone.trim();
+  const email = input.email.trim().toLowerCase();
+
+  if (!name || !phone || !email) {
+    throw new Error("Name, phone, and email are required.");
+  }
+
+  const existingEmail = await findCustomerByEmail(email);
+  if (existingEmail && existingEmail.id !== input.customerId) {
+    throw new Error("A member with this email is already registered.");
+  }
+
+  const existingByPhone = await findCustomerByPhone(phone);
+  if (existingByPhone && existingByPhone.id !== input.customerId) {
+    throw new Error("A member with this phone number is already registered.");
+  }
+
+  const sql = getSql();
+  const rows = await sql`
+    UPDATE customers
+    SET name = ${name}, phone = ${phone}, email = ${email}
+    WHERE id = ${input.customerId}
+    RETURNING *
+  `;
+
+  return mapCustomer(rows[0] as CustomerRow);
 }
 
 export async function getProducts(): Promise<Product[]> {
@@ -823,6 +859,18 @@ export async function getCompletedOrders(): Promise<CompletedOrder[]> {
       items: parsePendingOrderItems(row.items),
     })
   );
+}
+
+export async function getCustomerTotalVoucherSavings(
+  customerId: string
+): Promise<number> {
+  const sql = getSql();
+  const rows = await sql`
+    SELECT COALESCE(SUM(discount), 0)::int AS total
+    FROM completed_orders
+    WHERE customer_id = ${customerId}
+  `;
+  return Number(rows[0]?.total ?? 0);
 }
 
 async function saveCompletedOrder(

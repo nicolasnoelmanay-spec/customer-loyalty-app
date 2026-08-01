@@ -43,9 +43,24 @@ export async function apiGetCustomerSession(): Promise<boolean> {
 export async function apiGetCustomerAccount(): Promise<{
   customer: Customer;
   transactions: Transaction[];
+  totalVoucherSavings: number;
 }> {
   const response = await fetch("/api/customer-auth/me", {
     credentials: "include",
+  });
+  return parseJson(response);
+}
+
+export async function apiUpdateCustomerProfile(input: {
+  name: string;
+  phone: string;
+  email: string;
+}): Promise<{ customer: Customer; totalVoucherSavings: number }> {
+  const response = await fetch("/api/customer-auth/me", {
+    method: "PATCH",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
   });
   return parseJson(response);
 }
