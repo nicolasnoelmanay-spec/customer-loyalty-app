@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Gift, Search, Users } from "lucide-react";
+import { ArrowRight, Gift, Search, UserPlus, Users } from "lucide-react";
 import { AppHeader } from "@/components/app-header";
 import { buttonVariants } from "@/components/ui/button";
 import {
@@ -40,11 +40,17 @@ export default function HomePage() {
                 <ArrowRight className="size-4" />
               </Link>
               <Link
-                href="/lookup"
+                href="/login?customer=1"
                 className={cn(buttonVariants({ size: "lg", variant: "outline" }))}
               >
-                <Search className="size-4" />
-                Customer Lookup
+                My Account
+              </Link>
+              <Link
+                href="/login?join=1"
+                className={cn(buttonVariants({ size: "lg", variant: "outline" }))}
+              >
+                <UserPlus className="size-4" />
+                Join Now
               </Link>
             </div>
           </div>
@@ -71,9 +77,9 @@ export default function HomePage() {
             <Card className="sm:col-span-2 lg:col-span-1">
               <CardHeader>
                 <Search className="mb-2 size-8 text-emerald-600" />
-                <CardTitle>Self-Service Lookup</CardTitle>
+                <CardTitle>Customer Lookup</CardTitle>
                 <CardDescription>
-                  Customers can check their balance using phone or email — privately.
+                  Staff can search members by phone or email after signing in.
                 </CardDescription>
               </CardHeader>
             </Card>

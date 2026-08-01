@@ -1,8 +1,11 @@
 import type {
   CreateCustomerInput,
+  CreatePendingOrderInput,
+  CompletedOrder,
   Customer,
   LogPurchaseInput,
   LoyaltyData,
+  PendingOrder,
   Product,
   PurchaseItemInput,
   RedeemFreeDrinkVoucherInput,
@@ -50,6 +53,17 @@ export async function apiAddCustomer(
   return parseJson(response);
 }
 
+export async function apiRegisterMember(
+  input: CreateCustomerInput
+): Promise<Customer> {
+  const response = await fetch("/api/register", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  return parseJson(response);
+}
+
 export async function apiUpdateCustomer(
   input: UpdateCustomerInput
 ): Promise<Customer> {
@@ -71,6 +85,52 @@ export async function fetchProducts(): Promise<Product[]> {
   const response = await fetch("/api/products");
   const data = await parseJson<{ products: Product[] }>(response);
   return data.products;
+}
+
+export async function fetchCompletedOrders(): Promise<CompletedOrder[]> {
+  const response = await fetch("/api/completed-orders", {
+    credentials: "include",
+  });
+  const data = await parseJson<{ orders: CompletedOrder[] }>(response);
+  return data.orders;
+}
+
+export async function fetchPendingOrders(): Promise<PendingOrder[]> {
+  const response = await fetch("/api/pending-orders", {
+    credentials: "include",
+  });
+  const data = await parseJson<{ orders: PendingOrder[] }>(response);
+  return data.orders;
+}
+
+export async function apiCreatePendingOrder(
+  input: CreatePendingOrderInput
+): Promise<PendingOrder> {
+  const response = await fetch("/api/pending-orders", {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  return parseJson(response);
+}
+
+export async function apiCompletePendingOrder(
+  orderId: string
+): Promise<Transaction> {
+  const response = await fetch(`/api/pending-orders/${orderId}/complete`, {
+    method: "POST",
+    credentials: "include",
+  });
+  return parseJson(response);
+}
+
+export async function apiDeletePendingOrder(orderId: string): Promise<void> {
+  const response = await fetch(`/api/pending-orders/${orderId}`, {
+    method: "DELETE",
+    credentials: "include",
+  });
+  await parseJson(response);
 }
 
 export async function apiLogPurchase(

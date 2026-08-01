@@ -22,23 +22,33 @@ export function AddCustomerDialog() {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
   function reset() {
     setName("");
     setPhone("");
     setEmail("");
+    setUsername("");
+    setPassword("");
     setError("");
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!name.trim() || !phone.trim() || !email.trim()) {
+    if (
+      !name.trim() ||
+      !phone.trim() ||
+      !email.trim() ||
+      !username.trim() ||
+      !password
+    ) {
       setError("All fields are required.");
       return;
     }
     try {
-      await addCustomer({ name, phone, email });
+      await addCustomer({ name, phone, email, username, password });
       reset();
       setOpen(false);
     } catch (err) {
@@ -57,7 +67,7 @@ export function AddCustomerDialog() {
           <DialogHeader>
             <DialogTitle>Add New Customer</DialogTitle>
             <DialogDescription>
-              Register a customer to start tracking their loyalty points.
+              Register a customer with login credentials for the loyalty program.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
@@ -88,6 +98,27 @@ export function AddCustomerDialog() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="jane@email.com"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="username">Username</Label>
+              <Input
+                id="username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="janedoe"
+                autoComplete="username"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                autoComplete="new-password"
               />
             </div>
             {error && <p className="text-sm text-destructive">{error}</p>}

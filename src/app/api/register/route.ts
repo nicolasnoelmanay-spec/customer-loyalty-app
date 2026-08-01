@@ -1,16 +1,9 @@
-import { NextRequest, NextResponse } from "next/server";
-import {
-  handleRouteError,
-  jsonError,
-  requireStaffSession,
-} from "@/lib/api/route-utils";
-import { addCustomer } from "@/lib/data/neon-repository";
+import { NextResponse } from "next/server";
+import { handleRouteError, jsonError } from "@/lib/api/route-utils";
+import { registerMember } from "@/lib/data/neon-repository";
 
-export async function POST(request: NextRequest) {
+export async function POST(request: Request) {
   try {
-    const auth = await requireStaffSession();
-    if ("error" in auth) return auth.error;
-
     const body = await request.json();
     const name = body.name?.trim();
     const phone = body.phone?.trim();
@@ -25,7 +18,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const customer = await addCustomer({
+    const customer = await registerMember({
       name,
       phone,
       email,
@@ -34,6 +27,6 @@ export async function POST(request: NextRequest) {
     });
     return NextResponse.json(customer, { status: 201 });
   } catch (error) {
-    return handleRouteError(error, "Failed to add customer.");
+    return handleRouteError(error, "Failed to register member.");
   }
 }

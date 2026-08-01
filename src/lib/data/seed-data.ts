@@ -7,6 +7,7 @@ export const seedData: LoyaltyData = {
       name: "Nicolas Noel Manay",
       phone: "+63 917 123 4567",
       email: "nicolas.manay@email.com",
+      username: "nicolas",
       points: 0,
       totalPointsEarned: 0,
       consecutivePointsEarned: 0,

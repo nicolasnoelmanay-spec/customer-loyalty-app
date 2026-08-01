@@ -5,6 +5,7 @@ import {
   requireStaffSession,
 } from "@/lib/api/route-utils";
 import { logPurchase } from "@/lib/data/neon-repository";
+import { isValidDrinkTemperature } from "@/lib/data/drink-temperature";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -30,6 +31,12 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           item.quantity <= 0
         ) {
           return jsonError("Each item needs a productId and positive quantity.", 400);
+        }
+        if (
+          item.temperature !== undefined &&
+          !isValidDrinkTemperature(item.temperature)
+        ) {
+          return jsonError("Temperature must be hot or iced.", 400);
         }
       }
 

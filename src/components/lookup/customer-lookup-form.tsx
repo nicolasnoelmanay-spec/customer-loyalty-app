@@ -69,9 +69,10 @@ export function CustomerLookupForm() {
           <div className="mx-auto mb-2 flex size-12 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-950">
             <Sparkles className="size-6 text-emerald-600" />
           </div>
-          <CardTitle>Check Your Rewards</CardTitle>
+          <CardTitle>Customer Lookup</CardTitle>
           <CardDescription>
-            Enter your phone number or email to view your point balance.
+            Search by phone or email to view a member&apos;s points and recent
+            activity.
           </CardDescription>
         </CardHeader>
         <CardContent>

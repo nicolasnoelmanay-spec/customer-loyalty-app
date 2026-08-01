@@ -10,15 +10,12 @@ import { useAuth } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils";
 
 interface AppHeaderProps {
-  active?: "home" | "dashboard" | "products" | "lookup" | "login";
+  active?: "home" | "dashboard" | "products" | "pending-orders" | "completed-orders" | "lookup" | "customer" | "login";
 }
 
 export function AppHeader({ active }: AppHeaderProps) {
   const { isReady, isAuthenticated, logout } = useAuth();
   const router = useRouter();
-
-  const dashboardHref =
-    isReady && isAuthenticated ? "/dashboard" : "/login";
 
   async function handleLogout() {
     await logout();
@@ -36,20 +33,19 @@ export function AppHeader({ active }: AppHeaderProps) {
         </Link>
 
         <nav className="flex items-center gap-1 sm:gap-2">
-          <Link
-            href={dashboardHref}
-            className={cn(
-              buttonVariants({
-                variant:
-                  active === "dashboard" || active === "login"
-                    ? "secondary"
-                    : "ghost",
-                size: "sm",
-              })
-            )}
-          >
-            Dashboard
-          </Link>
+          {isReady && isAuthenticated && (
+            <Link
+              href="/dashboard"
+              className={cn(
+                buttonVariants({
+                  variant: active === "dashboard" ? "secondary" : "ghost",
+                  size: "sm",
+                })
+              )}
+            >
+              Dashboard
+            </Link>
+          )}
           {isReady && isAuthenticated && (
             <Link
               href="/products"
@@ -63,18 +59,63 @@ export function AppHeader({ active }: AppHeaderProps) {
               Products
             </Link>
           )}
+          {isReady && isAuthenticated && (
+            <Link
+              href="/pending-orders"
+              className={cn(
+                buttonVariants({
+                  variant: active === "pending-orders" ? "secondary" : "ghost",
+                  size: "sm",
+                })
+              )}
+            >
+              Pending Orders
+            </Link>
+          )}
+          {isReady && isAuthenticated && (
+            <Link
+              href="/completed-orders"
+              className={cn(
+                buttonVariants({
+                  variant: active === "completed-orders" ? "secondary" : "ghost",
+                  size: "sm",
+                })
+              )}
+            >
+              Completed Orders
+            </Link>
+          )}
+          {isReady && isAuthenticated && (
+            <Link
+              href="/lookup"
+              className={cn(
+                buttonVariants({
+                  variant: active === "lookup" ? "secondary" : "ghost",
+                  size: "sm",
+                })
+              )}
+            >
+              Customer Lookup
+            </Link>
+          )}
           <Link
-            href="/lookup"
+            href="/login?customer=1"
             className={cn(
               buttonVariants({
-                variant: active === "lookup" ? "secondary" : "ghost",
+                variant: active === "customer" ? "secondary" : "ghost",
                 size: "sm",
               })
             )}
           >
-            Customer Lookup
+            My Account
           </Link>
-          {isReady && isAuthenticated && (active === "dashboard" || active === "products") && (
+          {isReady && isAuthenticated && (
+            active === "dashboard" ||
+            active === "products" ||
+            active === "pending-orders" ||
+            active === "completed-orders" ||
+            active === "lookup"
+          ) && (
             <Button variant="ghost" size="sm" onClick={handleLogout}>
               <LogOut className="size-4" />
               Logout

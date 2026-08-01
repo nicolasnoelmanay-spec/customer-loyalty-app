@@ -8,9 +8,13 @@ import { getSql } from "@/lib/db";
 import type {
   CreateCustomerInput,
   Customer,
+  CreatePendingOrderInput,
   LogPurchaseInput,
   LoyaltyData,
+  PendingOrder,
+  CompletedOrder,
   Product,
+  PurchaseItemInput,
   RedeemFreeDrinkVoucherInput,
   RedeemPointsInput,
   RedeemVoucherInput,
@@ -29,6 +33,16 @@ import {
   calculatePurchaseTotals,
   formatCurrency,
 } from "./purchase-calculations";
+import {
+  normalizePurchaseItem,
+  validatePurchaseItemTemperature,
+} from "./drink-temperature";
+import {
+  enrichPendingOrder,
+  enrichCompletedOrder,
+  type CompletedOrderRecord,
+  type PendingOrderRecord,
+} from "./pending-order-utils";
 
 async function fetchCustomers(): Promise<Customer[]> {
   const sql = getSql();
@@ -56,6 +70,38 @@ async function getCustomerRow(id: string): Promise<CustomerRow | null> {
   return rows.length > 0 ? (rows[0] as CustomerRow) : null;
 }
 
+export async function getCustomerById(id: string): Promise<Customer | null> {
+  const row = await getCustomerRow(id);
+  return row ? mapCustomer(row) : null;
+}
+
+export async function authenticateCustomer(input: {
+  username: string;
+  password: string;
+}): Promise<Customer | null> {
+  const bcrypt = await import("bcryptjs");
+  const username = input.username.trim().toLowerCase();
+  if (!username || !input.password) return null;
+
+  const sql = getSql();
+  const rows = await sql`
+    SELECT *
+    FROM customers
+    WHERE LOWER(TRIM(username)) = ${username}
+    LIMIT 1
+  `;
+
+  if (rows.length === 0) return null;
+
+  const row = rows[0] as CustomerRow & { password_hash: string | null };
+  if (!row.password_hash) return null;
+
+  const valid = await bcrypt.compare(input.password, row.password_hash);
+  if (!valid) return null;
+
+  return mapCustomer(row);
+}
+
 export async function getLoyaltyData(): Promise<LoyaltyData> {
   const [customers, transactions] = await Promise.all([
     fetchCustomers(),
@@ -64,22 +110,65 @@ export async function getLoyaltyData(): Promise<LoyaltyData> {
   return { customers, transactions };
 }
 
-export async function findCustomerByContact(
-  phoneOrEmail: string
+export async function findCustomerByUsername(
+  username: string
 ): Promise<Customer | null> {
-  const query = normalizeContact(phoneOrEmail);
-  const trimmed = phoneOrEmail.trim();
+  const normalized = username.trim().toLowerCase();
+  if (!normalized) return null;
+
   const sql = getSql();
   const rows = await sql`
     SELECT *
     FROM customers
-    WHERE LOWER(TRIM(email)) = ${query}
-       OR LOWER(REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '+', ''))
-          LIKE ${"%" + query.replace(/\D/g, "") + "%"}
+    WHERE LOWER(TRIM(username)) = ${normalized}
+    LIMIT 1
+  `;
+  return rows.length > 0 ? mapCustomer(rows[0] as CustomerRow) : null;
+}
+
+export async function findCustomerByEmail(
+  email: string
+): Promise<Customer | null> {
+  const sql = getSql();
+  const rows = await sql`
+    SELECT *
+    FROM customers
+    WHERE LOWER(TRIM(email)) = ${normalizeContact(email)}
+    LIMIT 1
+  `;
+  return rows.length > 0 ? mapCustomer(rows[0] as CustomerRow) : null;
+}
+
+export async function findCustomerByPhone(
+  phone: string
+): Promise<Customer | null> {
+  const trimmed = phone.trim();
+  const digits = trimmed.replace(/\D/g, "");
+  if (!digits) return null;
+
+  const sql = getSql();
+  const rows = await sql`
+    SELECT *
+    FROM customers
+    WHERE LOWER(REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '+', ''))
+          LIKE ${"%" + digits + "%"}
        OR phone LIKE ${"%" + trimmed + "%"}
     LIMIT 1
   `;
   return rows.length > 0 ? mapCustomer(rows[0] as CustomerRow) : null;
+}
+
+export async function findCustomerByContact(
+  phoneOrEmail: string
+): Promise<Customer | null> {
+  const trimmed = phoneOrEmail.trim();
+  if (!trimmed) return null;
+
+  if (trimmed.includes("@")) {
+    return findCustomerByEmail(trimmed);
+  }
+
+  return findCustomerByPhone(trimmed);
 }
 
 export async function addCustomer(
@@ -89,22 +178,62 @@ export async function addCustomer(
   const name = input.name.trim();
   const phone = input.phone.trim();
   const email = input.email.trim().toLowerCase();
+  const username = input.username.trim().toLowerCase();
+  const password = input.password;
+
+  if (!username || !password) {
+    throw new Error("Username and password are required.");
+  }
+
+  const bcrypt = await import("bcryptjs");
+  const passwordHash = await bcrypt.hash(password, 10);
   const sql = getSql();
 
   const rows = await sql`
     INSERT INTO customers (
-      id, name, phone, email, points, total_points_earned,
+      id, name, phone, email, username, password_hash, points, total_points_earned,
       consecutive_points_earned, vouchers_available,
       free_drink_vouchers_available, total_vouchers_earned,
       total_free_drink_vouchers_earned
     )
     VALUES (
-      ${id}, ${name}, ${phone}, ${email}, 0, 0, 0, 0, 0, 0, 0
+      ${id}, ${name}, ${phone}, ${email}, ${username}, ${passwordHash}, 0, 0, 0, 0, 0, 0, 0
     )
     RETURNING *
   `;
 
   return mapCustomer(rows[0] as CustomerRow);
+}
+
+export async function registerMember(
+  input: CreateCustomerInput
+): Promise<Customer> {
+  const name = input.name.trim();
+  const phone = input.phone.trim();
+  const email = input.email.trim();
+  const username = input.username.trim().toLowerCase();
+  const password = input.password;
+
+  if (!name || !phone || !email || !username || !password) {
+    throw new Error("All fields are required.");
+  }
+
+  const existingUsername = await findCustomerByUsername(username);
+  if (existingUsername) {
+    throw new Error("That username is already taken.");
+  }
+
+  const existing = await findCustomerByEmail(email);
+  if (existing) {
+    throw new Error("A member with this email is already registered.");
+  }
+
+  const existingByPhone = await findCustomerByPhone(phone);
+  if (existingByPhone) {
+    throw new Error("A member with this phone number is already registered.");
+  }
+
+  return addCustomer({ name, phone, email, username, password });
 }
 
 export async function updateCustomer(
@@ -191,7 +320,15 @@ export async function logPurchase(
       throw new Error("One or more products were not found.");
     }
 
-    const totals = calculatePurchaseTotals(selectedItems, products);
+    const productMap = new Map(products.map((product) => [product.id, product]));
+    const normalizedItems = selectedItems.map((item) => {
+      const product = productMap.get(item.productId);
+      if (!product) throw new Error("One or more products were not found.");
+      validatePurchaseItemTemperature(item, product);
+      return normalizePurchaseItem(item, product);
+    });
+
+    const totals = calculatePurchaseTotals(normalizedItems, products);
     points = totals.pointsEarned;
     reason = `${totals.summary} (${formatCurrency(totals.subtotal)})`;
     if (notes) reason += ` — ${notes}`;
@@ -534,4 +671,239 @@ export async function ensureAdminStaff(
     INSERT INTO staff (id, username, password_hash, name)
     VALUES (${generateId("staff")}, ${username}, ${passwordHash}, ${name})
   `;
+}
+
+function parsePendingOrderItems(value: unknown): PurchaseItemInput[] {
+  if (!Array.isArray(value)) {
+    throw new Error("Invalid pending order items.");
+  }
+  return value as PurchaseItemInput[];
+}
+
+async function normalizePendingOrderItems(
+  items: PurchaseItemInput[],
+  products: Product[]
+): Promise<PurchaseItemInput[]> {
+  const productMap = new Map(products.map((product) => [product.id, product]));
+
+  return items.map((item) => {
+    const product = productMap.get(item.productId);
+    if (!product) {
+      throw new Error("One or more products were not found.");
+    }
+    validatePurchaseItemTemperature(item, product);
+    return normalizePurchaseItem(item, product);
+  });
+}
+
+export async function getPendingOrders(): Promise<PendingOrder[]> {
+  const sql = getSql();
+  const [rows, products] = await Promise.all([
+    sql`
+      SELECT
+        po.id,
+        po.customer_id,
+        c.name AS customer_name,
+        po.notes,
+        po.voucher_to_apply,
+        po.items,
+        po.created_at
+      FROM pending_orders po
+      INNER JOIN customers c ON c.id = po.customer_id
+      ORDER BY po.created_at DESC
+    `,
+    getProducts(),
+  ]);
+
+  return (rows as PendingOrderRecord[]).map((row) =>
+    enrichPendingOrder(
+      {
+        ...row,
+        items: parsePendingOrderItems(row.items),
+      },
+      products
+    )
+  );
+}
+
+export async function createPendingOrder(
+  input: CreatePendingOrderInput
+): Promise<PendingOrder> {
+  const customer = await getCustomerRow(input.customerId);
+  if (!customer) throw new Error("Customer not found.");
+
+  const selectedItems = input.items.filter((item) => item.quantity > 0);
+  if (selectedItems.length === 0) {
+    throw new Error("Add at least one product.");
+  }
+
+  for (const item of selectedItems) {
+    if (!Number.isInteger(item.quantity) || item.quantity <= 0) {
+      throw new Error("Invalid product quantity.");
+    }
+  }
+
+  const catalog = await getProducts();
+  const normalizedItems = await normalizePendingOrderItems(
+    selectedItems,
+    catalog
+  );
+
+  const voucherToApply = input.voucherToApply ?? "none";
+  if (voucherToApply === "voucher" && Number(customer.vouchers_available) <= 0) {
+    throw new Error("No 50% off vouchers available for this customer.");
+  }
+  if (
+    voucherToApply === "free-drink-voucher" &&
+    Number(customer.free_drink_vouchers_available) <= 0
+  ) {
+    throw new Error("No free drink vouchers available for this customer.");
+  }
+
+  const orderId = generateId("order");
+  const sql = getSql();
+  await sql`
+    INSERT INTO pending_orders (
+      id,
+      customer_id,
+      notes,
+      voucher_to_apply,
+      items
+    )
+    VALUES (
+      ${orderId},
+      ${input.customerId},
+      ${input.notes?.trim() ?? ""},
+      ${voucherToApply},
+      ${JSON.stringify(normalizedItems)}::jsonb
+    )
+  `;
+
+  const orders = await getPendingOrders();
+  const created = orders.find((order) => order.id === orderId);
+  if (!created) throw new Error("Failed to create pending order.");
+  return created;
+}
+
+export async function deletePendingOrder(orderId: string): Promise<void> {
+  const sql = getSql();
+  const rows = await sql`
+    DELETE FROM pending_orders WHERE id = ${orderId} RETURNING id
+  `;
+  if (rows.length === 0) {
+    throw new Error("Pending order not found.");
+  }
+}
+
+export async function getCompletedOrders(): Promise<CompletedOrder[]> {
+  const sql = getSql();
+  const rows = await sql`
+    SELECT
+      co.id,
+      co.customer_id,
+      c.name AS customer_name,
+      co.transaction_id,
+      co.notes,
+      co.voucher_to_apply,
+      co.items,
+      co.subtotal,
+      co.discount,
+      co.total,
+      co.points_earned,
+      co.created_at,
+      co.completed_at
+    FROM completed_orders co
+    INNER JOIN customers c ON c.id = co.customer_id
+    ORDER BY co.completed_at DESC
+  `;
+
+  return (rows as CompletedOrderRecord[]).map((row) =>
+    enrichCompletedOrder({
+      ...row,
+      items: parsePendingOrderItems(row.items),
+    })
+  );
+}
+
+async function saveCompletedOrder(
+  record: PendingOrderRecord,
+  products: Product[],
+  transactionId: string
+): Promise<void> {
+  const enriched = enrichPendingOrder(record, products);
+  const sql = getSql();
+  await sql`
+    INSERT INTO completed_orders (
+      id,
+      customer_id,
+      transaction_id,
+      notes,
+      voucher_to_apply,
+      items,
+      subtotal,
+      discount,
+      total,
+      points_earned,
+      created_at,
+      completed_at
+    )
+    VALUES (
+      ${record.id},
+      ${record.customer_id},
+      ${transactionId},
+      ${record.notes},
+      ${record.voucher_to_apply},
+      ${JSON.stringify(record.items)}::jsonb,
+      ${enriched.subtotal},
+      ${enriched.discount},
+      ${enriched.total},
+      ${enriched.pointsEarned},
+      ${record.created_at},
+      NOW()
+    )
+  `;
+}
+
+export async function completePendingOrder(orderId: string): Promise<Transaction> {
+  const sql = getSql();
+  const [rows, products] = await Promise.all([
+    sql`
+      SELECT
+        po.id,
+        po.customer_id,
+        c.name AS customer_name,
+        po.notes,
+        po.voucher_to_apply,
+        po.items,
+        po.created_at
+      FROM pending_orders po
+      INNER JOIN customers c ON c.id = po.customer_id
+      WHERE po.id = ${orderId}
+    `,
+    getProducts(),
+  ]);
+
+  if (rows.length === 0) {
+    throw new Error("Pending order not found.");
+  }
+
+  const record = rows[0] as PendingOrderRecord;
+  const items = parsePendingOrderItems(record.items);
+  const voucherToApply = record.voucher_to_apply as CreatePendingOrderInput["voucherToApply"];
+
+  const transaction = await logPurchase({
+    customerId: record.customer_id,
+    items,
+    notes: record.notes || undefined,
+  });
+
+  if (voucherToApply === "voucher") {
+    await redeemVoucher({ customerId: record.customer_id, count: 1 });
+  } else if (voucherToApply === "free-drink-voucher") {
+    await redeemFreeDrinkVoucher({ customerId: record.customer_id, count: 1 });
+  }
+
+  await saveCompletedOrder(record, products, transaction.id);
+  await deletePendingOrder(orderId);
+  return transaction;
 }

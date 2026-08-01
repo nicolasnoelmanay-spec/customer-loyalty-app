@@ -18,6 +18,8 @@ CREATE TABLE IF NOT EXISTS customers (
   name TEXT NOT NULL,
   phone TEXT NOT NULL,
   email TEXT NOT NULL,
+  username TEXT UNIQUE,
+  password_hash TEXT,
   points INTEGER NOT NULL DEFAULT 0,
   total_points_earned INTEGER NOT NULL DEFAULT 0,
   consecutive_points_earned INTEGER NOT NULL DEFAULT 0,
@@ -55,6 +57,13 @@ CREATE TABLE IF NOT EXISTS staff_sessions (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS customer_sessions (
+  id TEXT PRIMARY KEY,
+  customer_id TEXT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+  expires_at TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE TABLE IF NOT EXISTS products (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
@@ -66,6 +75,34 @@ CREATE TABLE IF NOT EXISTS products (
   sort_order INTEGER NOT NULL DEFAULT 0,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+CREATE TABLE IF NOT EXISTS pending_orders (
+  id TEXT PRIMARY KEY,
+  customer_id TEXT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+  notes TEXT NOT NULL DEFAULT '',
+  voucher_to_apply TEXT NOT NULL DEFAULT 'none',
+  items JSONB NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS pending_orders_created_at_idx ON pending_orders(created_at DESC);
+
+CREATE TABLE IF NOT EXISTS completed_orders (
+  id TEXT PRIMARY KEY,
+  customer_id TEXT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+  transaction_id TEXT REFERENCES transactions(id) ON DELETE SET NULL,
+  notes TEXT NOT NULL DEFAULT '',
+  voucher_to_apply TEXT NOT NULL DEFAULT 'none',
+  items JSONB NOT NULL,
+  subtotal INTEGER NOT NULL,
+  discount INTEGER NOT NULL,
+  total INTEGER NOT NULL,
+  points_earned INTEGER NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL,
+  completed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS completed_orders_completed_at_idx ON completed_orders(completed_at DESC);
 `;
 
 const seedCustomer = {
@@ -73,6 +110,8 @@ const seedCustomer = {
   name: "Nicolas Noel Manay",
   phone: "+63 917 123 4567",
   email: "nicolas.manay@email.com",
+  username: "nicolas",
+  password: "12345",
   points: 0,
   total_points_earned: 0,
   consecutive_points_earned: 0,
@@ -200,15 +239,19 @@ async function ensureAdminStaff() {
 async function migrateCustomers(customers, transactions) {
   for (const raw of customers) {
     const customer = computeCustomerFields(raw, transactions);
+    const passwordHash = customer.password
+      ? await bcrypt.hash(customer.password, 10)
+      : null;
     await sql`
       INSERT INTO customers (
-        id, name, phone, email, points, total_points_earned,
+        id, name, phone, email, username, password_hash, points, total_points_earned,
         consecutive_points_earned, vouchers_available,
         free_drink_vouchers_available, total_vouchers_earned,
         total_free_drink_vouchers_earned, created_at
       )
       VALUES (
         ${customer.id}, ${customer.name}, ${customer.phone}, ${customer.email},
+        ${customer.username ?? null}, ${passwordHash},
         ${customer.points}, ${customer.total_points_earned},
         ${customer.consecutive_points_earned}, ${customer.vouchers_available},
         ${customer.free_drink_vouchers_available}, ${customer.total_vouchers_earned},
@@ -227,6 +270,54 @@ async function migrateCustomers(customers, transactions) {
       )
       ON CONFLICT (id) DO NOTHING
     `;
+  }
+}
+
+async function migrateCustomerAuthColumns() {
+  await sql`ALTER TABLE customers ADD COLUMN IF NOT EXISTS username TEXT`;
+  await sql`ALTER TABLE customers ADD COLUMN IF NOT EXISTS password_hash TEXT`;
+}
+
+async function backfillCustomerCredentials() {
+  const defaultPasswordHash = await bcrypt.hash("12345", 10);
+  const rows = await sql`
+    SELECT id, email, username, password_hash
+    FROM customers
+    WHERE username IS NULL OR password_hash IS NULL
+  `;
+
+  for (const row of rows) {
+    let username = row.username;
+    if (!username) {
+      const base =
+        row.email.split("@")[0].toLowerCase().replace(/[^a-z0-9_]/g, "") ||
+        "member";
+      username = base;
+      let suffix = 1;
+      while (true) {
+        const existing = await sql`
+          SELECT id FROM customers
+          WHERE LOWER(username) = ${username.toLowerCase()} AND id <> ${row.id}
+          LIMIT 1
+        `;
+        if (existing.length === 0) break;
+        username = `${base}${suffix}`;
+        suffix += 1;
+      }
+    }
+
+    await sql`
+      UPDATE customers
+      SET username = ${username},
+          password_hash = ${row.password_hash ?? defaultPasswordHash}
+      WHERE id = ${row.id}
+    `;
+  }
+
+  if (rows.length > 0) {
+    console.log(
+      `Backfilled credentials for ${rows.length} existing customer(s). Default password: 12345`
+    );
   }
 }
 
@@ -249,6 +340,9 @@ console.log("Creating Neon schema...");
 for (const statement of SCHEMA.split(";").map((s) => s.trim()).filter(Boolean)) {
   await sql.query(statement);
 }
+
+await migrateCustomerAuthColumns();
+await backfillCustomerCredentials();
 
 await ensureAdminStaff();
 await seedProductCatalog();

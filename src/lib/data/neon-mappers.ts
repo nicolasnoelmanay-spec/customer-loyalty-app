@@ -5,6 +5,7 @@ export interface CustomerRow {
   name: string;
   phone: string;
   email: string;
+  username: string | null;
   points: number;
   total_points_earned: number;
   consecutive_points_earned: number;
@@ -30,6 +31,7 @@ export function mapCustomer(row: CustomerRow): Customer {
     name: row.name,
     phone: row.phone,
     email: row.email,
+    username: row.username ?? "",
     points: Number(row.points),
     totalPointsEarned: Number(row.total_points_earned),
     consecutivePointsEarned: Number(row.consecutive_points_earned),

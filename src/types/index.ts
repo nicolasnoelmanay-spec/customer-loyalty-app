@@ -12,6 +12,7 @@ export interface Customer {
   name: string;
   phone: string;
   email: string;
+  username: string;
   points: number;
   /** Cumulative points earned from coffee purchases (never reduced by redemptions) */
   totalPointsEarned: number;
@@ -43,6 +44,8 @@ export interface CreateCustomerInput {
   name: string;
   phone: string;
   email: string;
+  username: string;
+  password: string;
 }
 
 export interface UpdateCustomerInput {
@@ -62,6 +65,8 @@ export interface LogPurchaseInput {
 
 export type ProductCategory = "drink" | "snack";
 
+export type DrinkTemperature = "hot" | "iced";
+
 export interface Product {
   id: string;
   name: string;
@@ -76,6 +81,35 @@ export interface Product {
 export interface PurchaseItemInput {
   productId: string;
   quantity: number;
+  temperature?: DrinkTemperature;
+}
+
+export type VoucherApplyOption = "none" | "voucher" | "free-drink-voucher";
+
+export interface PendingOrder {
+  id: string;
+  customerId: string;
+  customerName: string;
+  items: PurchaseItemInput[];
+  notes: string;
+  voucherToApply: VoucherApplyOption;
+  subtotal: number;
+  discount: number;
+  total: number;
+  pointsEarned: number;
+  createdAt: string;
+}
+
+export interface CompletedOrder extends PendingOrder {
+  transactionId: string | null;
+  completedAt: string;
+}
+
+export interface CreatePendingOrderInput {
+  customerId: string;
+  items: PurchaseItemInput[];
+  notes?: string;
+  voucherToApply?: VoucherApplyOption;
 }
 
 export interface RedeemPointsInput {

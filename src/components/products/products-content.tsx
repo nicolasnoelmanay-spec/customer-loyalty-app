@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import {
   Coffee,
   Cookie,
@@ -8,6 +9,7 @@ import {
   Plus,
   ShoppingBag,
   Sparkles,
+  Ticket,
 } from "lucide-react";
 import { applyStreakPointsEarned, loyaltyConfig } from "@/config/loyalty";
 import { CustomerSelectField } from "@/components/dashboard/customer-select-field";
@@ -24,14 +26,26 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  calculateCheckoutTotal,
   calculatePurchaseTotals,
   formatCurrency,
+  getUnitPrice,
+  icedDrinkSurchargeLabel,
   minDrinkPriceForPointsLabel,
   productQualifiesForPoints,
+  type VoucherApplyOption,
 } from "@/lib/data/purchase-calculations";
-import { apiLogPurchase, fetchProducts } from "@/lib/api/loyalty-client";
+import {
+  decodeCartKey,
+  encodeCartKey,
+  formatTemperatureLabel,
+  productOffersHotCold,
+  resolveItemTemperature,
+} from "@/lib/data/drink-temperature";
+import { apiCreatePendingOrder, fetchProducts } from "@/lib/api/loyalty-client";
 import { useLoyalty } from "@/hooks/use-loyalty";
-import type { Product, ProductCategory, PurchaseItemInput } from "@/types";
+import { cn } from "@/lib/utils";
+import type { DrinkTemperature, Product, ProductCategory, PurchaseItemInput } from "@/types";
 
 type Cart = Record<string, number>;
 
@@ -40,7 +54,7 @@ function categoryIcon(category: ProductCategory) {
 }
 
 export function ProductsContent() {
-  const { customers, refresh } = useLoyalty();
+  const { customers } = useLoyalty();
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [customerId, setCustomerId] = useState("");
@@ -49,6 +63,10 @@ export function ProductsContent() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [voucherToApply, setVoucherToApply] = useState<VoucherApplyOption>("none");
+  const [drinkTemperature, setDrinkTemperature] = useState<
+    Record<string, DrinkTemperature>
+  >({});
 
   useEffect(() => {
     let cancelled = false;
@@ -72,21 +90,28 @@ export function ProductsContent() {
     () =>
       Object.entries(cart)
         .filter(([, quantity]) => quantity > 0)
-        .map(([productId, quantity]) => ({ productId, quantity })),
+        .map(([key, quantity]) => {
+          const { productId, temperature } = decodeCartKey(key);
+          return temperature
+            ? { productId, quantity, temperature }
+            : { productId, quantity };
+        }),
     [cart]
   );
 
   const cartProducts = useMemo(
     () =>
-      cartItems
-        .map((item) => ({
-          product: products.find((entry) => entry.id === item.productId),
-          quantity: item.quantity,
-        }))
-        .filter(
-          (entry): entry is { product: Product; quantity: number } =>
-            Boolean(entry.product)
-        ),
+      cartItems.flatMap((item) => {
+        const product = products.find((entry) => entry.id === item.productId);
+        if (!product) return [];
+        return [
+          {
+            product,
+            quantity: item.quantity,
+            temperature: item.temperature,
+          },
+        ];
+      }),
     [cartItems, products]
   );
 
@@ -95,7 +120,15 @@ export function ProductsContent() {
     [cartItems, products]
   );
 
+  const checkoutTotal = useMemo(
+    () => calculateCheckoutTotal(totals.subtotal, cartProducts, voucherToApply),
+    [totals.subtotal, cartProducts, voucherToApply]
+  );
+
   const selectedCustomer = customers.find((customer) => customer.id === customerId);
+  const hasFiftyOffVoucher = (selectedCustomer?.vouchersAvailable ?? 0) > 0;
+  const hasFreeDrinkVoucher =
+    (selectedCustomer?.freeDrinkVouchersAvailable ?? 0) > 0;
   const streakPreview =
     selectedCustomer && totals.pointsEarned > 0
       ? applyStreakPointsEarned(
@@ -104,14 +137,35 @@ export function ProductsContent() {
         )
       : null;
 
-  const updateQuantity = useCallback((productId: string, delta: number) => {
+  const getSelectedTemperature = useCallback(
+    (product: Product): DrinkTemperature => {
+      if (productOffersHotCold(product)) {
+        return drinkTemperature[product.id] ?? "hot";
+      }
+      return "iced";
+    },
+    [drinkTemperature]
+  );
+
+  const cartKeyForProduct = useCallback(
+    (product: Product) => {
+      const temperature = resolveItemTemperature(
+        product,
+        getSelectedTemperature(product)
+      );
+      return encodeCartKey(product.id, temperature);
+    },
+    [getSelectedTemperature]
+  );
+
+  const updateQuantity = useCallback((cartKey: string, delta: number) => {
     setCart((current) => {
-      const nextQuantity = Math.max(0, (current[productId] ?? 0) + delta);
+      const nextQuantity = Math.max(0, (current[cartKey] ?? 0) + delta);
       if (nextQuantity === 0) {
-        const { [productId]: _, ...rest } = current;
+        const { [cartKey]: _, ...rest } = current;
         return rest;
       }
-      return { ...current, [productId]: nextQuantity };
+      return { ...current, [cartKey]: nextQuantity };
     });
   }, []);
 
@@ -119,15 +173,21 @@ export function ProductsContent() {
     setCart({});
     setNotes("");
     setError(null);
+    setVoucherToApply("none");
   }
 
-  async function handleCheckout(e: React.FormEvent) {
+  function handleCustomerChange(nextCustomerId: string) {
+    setCustomerId(nextCustomerId);
+    setVoucherToApply("none");
+  }
+
+  async function handleAddToPendingOrder(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setSuccess(null);
 
     if (!customerId) {
-      setError("Select a customer before checkout.");
+      setError("Select a customer before adding to pending orders.");
       return;
     }
     if (cartItems.length === 0) {
@@ -137,16 +197,17 @@ export function ProductsContent() {
 
     setIsSubmitting(true);
     try {
-      await apiLogPurchase({
+      await apiCreatePendingOrder({
         customerId,
         items: cartItems,
         notes: notes.trim() || undefined,
+        voucherToApply,
       });
-      await refresh();
+
       resetCheckout();
-      setSuccess("Purchase completed and loyalty points updated.");
+      setSuccess("Added to pending orders.");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Checkout failed.");
+      setError(err instanceof Error ? err.message : "Failed to add pending order.");
     } finally {
       setIsSubmitting(false);
     }
@@ -178,7 +239,10 @@ export function ProductsContent() {
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {filtered.map((product) => {
           const Icon = categoryIcon(product.category);
-          const quantity = cart[product.id] ?? 0;
+          const cartKey = cartKeyForProduct(product);
+          const quantity = cart[cartKey] ?? 0;
+          const selectedTemp = getSelectedTemperature(product);
+          const unitPrice = getUnitPrice(product, selectedTemp);
 
           return (
             <Card key={product.id} className="overflow-hidden">
@@ -195,17 +259,57 @@ export function ProductsContent() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex flex-wrap items-center gap-2">
-                  <Badge variant="secondary">{formatCurrency(product.price)}</Badge>
-                  {productQualifiesForPoints(product) ? (
+                  <Badge variant="secondary">{formatCurrency(unitPrice)}</Badge>
+                  {productQualifiesForPoints(product, selectedTemp) ? (
                     <Badge variant="secondary" className="bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
                       +{loyaltyConfig.pointsPerDrink} pt
                     </Badge>
                   ) : product.category === "drink" ? (
-                    <Badge variant="secondary">Under {minDrinkPriceForPointsLabel()}</Badge>
+                    <Badge variant="secondary">
+                      Under {minDrinkPriceForPointsLabel()} ({formatTemperatureLabel(selectedTemp)})
+                    </Badge>
                   ) : (
                     <Badge variant="secondary">No points</Badge>
                   )}
                 </div>
+                {product.category === "drink" && (
+                  <div className="space-y-2">
+                    {productOffersHotCold(product) ? (
+                      <>
+                        <Label className="text-xs text-muted-foreground">
+                          Temperature
+                        </Label>
+                        <div className="grid grid-cols-2 gap-2">
+                          {(["hot", "iced"] as const).map((temp) => (
+                            <button
+                              key={temp}
+                              type="button"
+                              onClick={() =>
+                                setDrinkTemperature((current) => ({
+                                  ...current,
+                                  [product.id]: temp,
+                                }))
+                              }
+                              className={cn(
+                                "rounded-md border px-2 py-1.5 text-xs font-medium transition-colors",
+                                selectedTemp === temp
+                                  ? "border-emerald-600 bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"
+                                  : "border-border hover:bg-muted/50"
+                              )}
+                            >
+                              {formatTemperatureLabel(temp)}
+                            </button>
+                          ))}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Iced adds {icedDrinkSurchargeLabel()}
+                        </p>
+                      </>
+                    ) : (
+                      <Badge variant="secondary">Iced only</Badge>
+                    )}
+                  </div>
+                )}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Button
@@ -213,7 +317,7 @@ export function ProductsContent() {
                       variant="outline"
                       size="icon-sm"
                       aria-label={`Decrease ${product.name}`}
-                      onClick={() => updateQuantity(product.id, -1)}
+                      onClick={() => updateQuantity(cartKey, -1)}
                       disabled={quantity === 0}
                     >
                       <Minus className="size-4" />
@@ -224,7 +328,7 @@ export function ProductsContent() {
                       variant="outline"
                       size="icon-sm"
                       aria-label={`Increase ${product.name}`}
-                      onClick={() => updateQuantity(product.id, 1)}
+                      onClick={() => updateQuantity(cartKey, 1)}
                     >
                       <Plus className="size-4" />
                     </Button>
@@ -234,7 +338,7 @@ export function ProductsContent() {
                     size="sm"
                     variant={quantity > 0 ? "secondary" : "default"}
                     className={quantity === 0 ? "bg-emerald-600 hover:bg-emerald-700 text-white" : undefined}
-                    onClick={() => updateQuantity(product.id, 1)}
+                    onClick={() => updateQuantity(cartKey, 1)}
                   >
                     Add
                   </Button>
@@ -282,19 +386,108 @@ export function ProductsContent() {
             Checkout
           </CardTitle>
           <CardDescription>
-            Drinks priced at {minDrinkPriceForPointsLabel()} or more earn{" "}
-            {loyaltyConfig.pointsPerDrink} loyalty point each. Cheaper drinks and
-            snacks do not earn points.
+            Drinks are available hot or iced (+{icedDrinkSurchargeLabel()} for iced),
+            except Cold Brew. Drinks priced at {minDrinkPriceForPointsLabel()} or more
+            earn {loyaltyConfig.pointsPerDrink} loyalty point each.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleCheckout} className="space-y-4">
+          <form onSubmit={handleAddToPendingOrder} className="space-y-4">
             <CustomerSelectField
               customerId={customerId}
               customers={customers}
-              onCustomerIdChange={setCustomerId}
+              onCustomerIdChange={handleCustomerChange}
               onScanError={setError}
             />
+
+            {selectedCustomer && (
+              <div className="rounded-lg border bg-muted/30 px-3 py-3 text-sm space-y-2">
+                <p className="font-medium">Available vouchers</p>
+                <div className="flex flex-wrap gap-2">
+                  <Badge
+                    variant="secondary"
+                    className={
+                      hasFiftyOffVoucher
+                        ? "bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300"
+                        : undefined
+                    }
+                  >
+                    <Ticket className="mr-1 size-3" />
+                    {selectedCustomer.vouchersAvailable} ×{" "}
+                    {loyaltyConfig.voucher.label}
+                  </Badge>
+                  <Badge
+                    variant="secondary"
+                    className={
+                      hasFreeDrinkVoucher
+                        ? "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+                        : undefined
+                    }
+                  >
+                    <Coffee className="mr-1 size-3" />
+                    {selectedCustomer.freeDrinkVouchersAvailable} ×{" "}
+                    {loyaltyConfig.freeDrinkVoucher.label}
+                  </Badge>
+                </div>
+                {(hasFiftyOffVoucher || hasFreeDrinkVoucher) && (
+                  <div className="space-y-2 pt-1">
+                    <Label>Apply voucher to this order</Label>
+                    <div className="grid gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setVoucherToApply("none")}
+                        className={cn(
+                          "rounded-lg border px-3 py-2 text-left text-sm transition-colors",
+                          voucherToApply === "none"
+                            ? "border-emerald-600 bg-emerald-50 dark:bg-emerald-950/40"
+                            : "border-border hover:bg-muted/50"
+                        )}
+                      >
+                        No voucher
+                      </button>
+                      {hasFiftyOffVoucher && (
+                        <button
+                          type="button"
+                          onClick={() => setVoucherToApply("voucher")}
+                          className={cn(
+                            "rounded-lg border px-3 py-2 text-left text-sm transition-colors",
+                            voucherToApply === "voucher"
+                              ? "border-indigo-600 bg-indigo-50 dark:bg-indigo-950/40"
+                              : "border-border hover:bg-muted/50"
+                          )}
+                        >
+                          <span className="font-medium">
+                            {loyaltyConfig.voucher.label}
+                          </span>
+                          <span className="block text-muted-foreground">
+                            50% off one drink · uses 1 from stack
+                          </span>
+                        </button>
+                      )}
+                      {hasFreeDrinkVoucher && (
+                        <button
+                          type="button"
+                          onClick={() => setVoucherToApply("free-drink-voucher")}
+                          className={cn(
+                            "rounded-lg border px-3 py-2 text-left text-sm transition-colors",
+                            voucherToApply === "free-drink-voucher"
+                              ? "border-amber-600 bg-amber-50 dark:bg-amber-950/40"
+                              : "border-border hover:bg-muted/50"
+                          )}
+                        >
+                          <span className="font-medium">
+                            {loyaltyConfig.freeDrinkVoucher.label}
+                          </span>
+                          <span className="block text-muted-foreground">
+                            Uses 1 from stack · does not affect points
+                          </span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label>Order</Label>
@@ -304,32 +497,64 @@ export function ProductsContent() {
                 </p>
               ) : (
                 <div className="space-y-2">
-                  {cartProducts.map(({ product, quantity }) => (
+                  {cartProducts.map(({ product, quantity, temperature }) => {
+                    const unitPrice = getUnitPrice(product, temperature);
+                    return (
                     <div
-                      key={product.id}
+                      key={`${product.id}:${temperature ?? "snack"}`}
                       className="flex items-start justify-between gap-3 rounded-lg border bg-muted/30 px-3 py-2 text-sm"
                     >
                       <div>
-                        <p className="font-medium">{product.name}</p>
+                        <p className="font-medium">
+                          {product.name}
+                          {temperature
+                            ? ` · ${formatTemperatureLabel(temperature)}`
+                            : ""}
+                        </p>
                         <p className="text-muted-foreground">
-                          {quantity} × {formatCurrency(product.price)}
+                          {quantity} × {formatCurrency(unitPrice)}
                         </p>
                       </div>
                       <p className="font-medium">
-                        {formatCurrency(product.price * quantity)}
+                        {formatCurrency(unitPrice * quantity)}
                       </p>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
 
-            <div className="rounded-lg border bg-muted/30 px-3 py-3 text-sm space-y-1">
+            <div className="rounded-lg border bg-muted/30 px-3 py-3 text-sm space-y-2">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Subtotal</span>
-                <span className="font-medium">{formatCurrency(totals.subtotal)}</span>
+                <span className="font-medium">
+                  {formatCurrency(checkoutTotal.subtotal)}
+                </span>
               </div>
-              <div className="flex justify-between">
+              {checkoutTotal.discount > 0 && checkoutTotal.discountLabel && (
+                <div className="flex justify-between text-indigo-700 dark:text-indigo-300">
+                  <span>{checkoutTotal.discountLabel}</span>
+                  <span className="font-medium">
+                    −{formatCurrency(checkoutTotal.discount)}
+                  </span>
+                </div>
+              )}
+              <div className="flex justify-between border-t pt-2">
+                <span className="font-semibold">Total</span>
+                <span className="text-base font-semibold">
+                  {formatCurrency(checkoutTotal.total)}
+                </span>
+              </div>
+              {(voucherToApply === "voucher" ||
+                voucherToApply === "free-drink-voucher") &&
+                checkoutTotal.discount === 0 &&
+                cartProducts.length > 0 && (
+                  <p className="text-xs text-amber-700 dark:text-amber-300">
+                    Add a drink to apply the selected voucher discount.
+                  </p>
+                )}
+              <div className="flex justify-between border-t pt-2">
                 <span className="text-muted-foreground">Points to award</span>
                 <span className="font-medium text-emerald-600 dark:text-emerald-400">
                   +{totals.pointsEarned}
@@ -375,7 +600,12 @@ export function ProductsContent() {
 
             {error && <p className="text-sm text-destructive">{error}</p>}
             {success && (
-              <p className="text-sm text-emerald-600 dark:text-emerald-400">{success}</p>
+              <p className="text-sm text-emerald-600 dark:text-emerald-400">
+                {success}{" "}
+                <Link href="/pending-orders" className="font-medium underline underline-offset-2">
+                  View pending orders
+                </Link>
+              </p>
             )}
 
             <Button
@@ -383,7 +613,11 @@ export function ProductsContent() {
               className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
               disabled={isSubmitting || cartProducts.length === 0}
             >
-              {isSubmitting ? "Processing..." : "Complete Purchase"}
+              {isSubmitting
+                ? "Adding..."
+                : cartProducts.length > 0
+                  ? `Add to Pending Order · ${formatCurrency(checkoutTotal.total)}`
+                  : "Add to Pending Order"}
             </Button>
           </form>
         </CardContent>

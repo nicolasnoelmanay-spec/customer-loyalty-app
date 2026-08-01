@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { handleRouteError, jsonError } from "@/lib/api/route-utils";
+import {
+  handleRouteError,
+  jsonError,
+  requireStaffSession,
+} from "@/lib/api/route-utils";
 import {
   findCustomerByContact,
   getTransactionsForCustomer,
@@ -7,6 +11,9 @@ import {
 
 export async function GET(request: NextRequest) {
   try {
+    const auth = await requireStaffSession();
+    if ("error" in auth) return auth.error;
+
     const query = request.nextUrl.searchParams.get("q")?.trim();
     if (!query) {
       return jsonError("Query parameter q is required.", 400);

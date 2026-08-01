@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AuthProvider } from "@/hooks/use-auth";
+import { CustomerAuthProvider } from "@/hooks/use-customer-auth";
 import { LoyaltyProvider } from "@/hooks/use-loyalty";
 import { loyaltyConfig } from "@/config/loyalty";
 import "./globals.css";
@@ -36,7 +37,9 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col">
         <ThemeProvider>
           <AuthProvider>
-            <LoyaltyProvider>{children}</LoyaltyProvider>
+            <CustomerAuthProvider>
+              <LoyaltyProvider>{children}</LoyaltyProvider>
+            </CustomerAuthProvider>
           </AuthProvider>
         </ThemeProvider>
       </body>

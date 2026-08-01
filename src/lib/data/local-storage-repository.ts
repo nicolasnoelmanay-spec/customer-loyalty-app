@@ -102,6 +102,7 @@ export class LocalStorageLoyaltyRepository implements LoyaltyRepository {
       name: input.name.trim(),
       phone: input.phone.trim(),
       email: input.email.trim().toLowerCase(),
+      username: input.username.trim().toLowerCase(),
       points: 0,
       totalPointsEarned: 0,
       consecutivePointsEarned: 0,
