@@ -13,11 +13,11 @@ async function main() {
 
   await prisma.staff.upsert({
     where: { username: authConfig.defaultUsername },
-    update: { passwordHash },
+    update: { passwordHash, name: authConfig.defaultName },
     create: {
       username: authConfig.defaultUsername,
-      passwordHash,
       name: authConfig.defaultName,
+      passwordHash,
     },
   });
 

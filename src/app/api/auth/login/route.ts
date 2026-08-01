@@ -1,12 +1,13 @@
 import { NextRequest } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db/prisma";
+import { ensureDatabaseInitialized } from "@/lib/db/initialize-database";
 import { setStaffSession } from "@/lib/auth/staff-session";
-import { ensureDbReady, handleRouteError, jsonError, jsonResponse } from "@/lib/api/route-utils";
+import { handleRouteError, jsonError, jsonResponse } from "@/lib/api/route-utils";
 
 export async function POST(request: NextRequest) {
   try {
-    await ensureDbReady();
+    await ensureDatabaseInitialized();
 
     const { username, password } = (await request.json()) as {
       username?: string;

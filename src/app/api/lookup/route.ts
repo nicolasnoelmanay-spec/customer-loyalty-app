@@ -1,10 +1,9 @@
 import { NextRequest } from "next/server";
 import { getPrismaLoyaltyRepository } from "@/lib/data/prisma-repository";
-import { ensureDbReady, handleRouteError, jsonError, jsonResponse } from "@/lib/api/route-utils";
+import { handleRouteError, jsonError, jsonResponse } from "@/lib/api/route-utils";
 
 export async function GET(request: NextRequest) {
   try {
-    await ensureDbReady();
     const contact = request.nextUrl.searchParams.get("contact");
     if (!contact?.trim()) {
       return jsonError("Contact query parameter is required.");
