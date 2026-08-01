@@ -101,10 +101,13 @@ export interface StaffUser {
   name: string | null;
 }
 
-export async function loginStaff(username: string): Promise<StaffUser> {
+export async function loginStaff(
+  username: string,
+  password: string
+): Promise<StaffUser> {
   return fetchJson<StaffUser>("/api/auth/login", {
     method: "POST",
-    body: JSON.stringify({ username }),
+    body: JSON.stringify({ username, password }),
   });
 }
 
