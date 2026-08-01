@@ -1,17 +1,13 @@
-import bcrypt from "bcryptjs";
-import { authConfig, getDefaultAdminPassword } from "@/config/auth";
+import { authConfig } from "@/config/auth";
 import { prisma } from "./prisma";
 
 let initPromise: Promise<void> | null = null;
 
 export async function createDefaultAdminUser(): Promise<void> {
-  const passwordHash = await bcrypt.hash(getDefaultAdminPassword(), 12);
-
   await prisma.staff.create({
     data: {
       username: authConfig.defaultUsername,
       name: authConfig.defaultName,
-      passwordHash,
     },
   });
 }
