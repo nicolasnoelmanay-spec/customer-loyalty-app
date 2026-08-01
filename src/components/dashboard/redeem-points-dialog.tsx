@@ -72,7 +72,7 @@ export function RedeemPointsDialog() {
     setError("");
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!customerId) {
       setError("Please select a customer.");
@@ -93,7 +93,7 @@ export function RedeemPointsDialog() {
           setError(`Only ${maxFiftyOff} voucher(s) in stack.`);
           return;
         }
-        redeemVoucher({
+        await redeemVoucher({
           customerId,
           count: quantityNum,
           reason: reason.trim() || undefined,
@@ -111,7 +111,7 @@ export function RedeemPointsDialog() {
           setError(`Only ${maxFreeDrink} voucher(s) in stack.`);
           return;
         }
-        redeemFreeDrinkVoucher({
+        await redeemFreeDrinkVoucher({
           customerId,
           count: quantityNum,
           reason: reason.trim() || undefined,
@@ -121,7 +121,7 @@ export function RedeemPointsDialog() {
           setError("Enter a valid point amount.");
           return;
         }
-        redeemPoints({
+        await redeemPoints({
           customerId,
           points: pointsNum,
           reason: reason.trim() || undefined,

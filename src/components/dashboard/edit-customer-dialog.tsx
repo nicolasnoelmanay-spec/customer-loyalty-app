@@ -35,7 +35,7 @@ function EditCustomerForm({
   const [points, setPoints] = useState(String(customer.points));
   const [error, setError] = useState("");
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim() || !phone.trim() || !email.trim()) {
       setError("Name, phone, and email are required.");
@@ -47,7 +47,7 @@ function EditCustomerForm({
       return;
     }
     try {
-      updateCustomer({
+      await updateCustomer({
         customerId: customer.id,
         name,
         phone,

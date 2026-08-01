@@ -51,7 +51,7 @@ export function LogPurchaseDialog() {
     setError("");
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!customerId) {
       setError("Please select a customer.");
@@ -62,7 +62,7 @@ export function LogPurchaseDialog() {
       return;
     }
     try {
-      logPurchase({ customerId, drinkCount: countNum, notes });
+      await logPurchase({ customerId, drinkCount: countNum, notes });
       reset();
       setOpen(false);
     } catch (err) {

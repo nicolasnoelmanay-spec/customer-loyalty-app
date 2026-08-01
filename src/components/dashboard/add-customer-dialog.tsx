@@ -31,15 +31,19 @@ export function AddCustomerDialog() {
     setError("");
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim() || !phone.trim() || !email.trim()) {
       setError("All fields are required.");
       return;
     }
-    addCustomer({ name, phone, email });
-    reset();
-    setOpen(false);
+    try {
+      await addCustomer({ name, phone, email });
+      reset();
+      setOpen(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong.");
+    }
   }
 
   return (

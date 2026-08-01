@@ -128,8 +128,8 @@ export function TransactionLedger() {
   const { transactions, getCustomerById, clearTransactionHistory } = useLoyalty();
   const [confirmOpen, setConfirmOpen] = useState(false);
 
-  function handleClear() {
-    clearTransactionHistory();
+  async function handleClear() {
+    await clearTransactionHistory();
     setConfirmOpen(false);
   }
 

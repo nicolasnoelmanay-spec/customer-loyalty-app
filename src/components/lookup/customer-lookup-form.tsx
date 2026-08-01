@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ArrowDownLeft, ArrowUpRight, Coffee, Search, Sparkles, Ticket } from "lucide-react";
 import { formatTransactionDate } from "@/lib/format-date";
 import { formatStreakProgress, loyaltyConfig } from "@/config/loyalty";
+import { lookupCustomer } from "@/lib/api/loyalty-client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,26 +24,38 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useLoyalty } from "@/hooks/use-loyalty";
-import type { Customer } from "@/types";
+import type { Customer, Transaction } from "@/types";
 
 export function CustomerLookupForm() {
-  const { isReady, findCustomerByContact, getTransactionsForCustomer } = useLoyalty();
   const [query, setQuery] = useState("");
   const [customer, setCustomer] = useState<Customer | null>(null);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [notFound, setNotFound] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  function handleSearch(e: React.FormEvent) {
+  async function handleSearch(e: React.FormEvent) {
     e.preventDefault();
-    if (!isReady) return;
-    const found = findCustomerByContact(query);
-    setCustomer(found ?? null);
-    setNotFound(!found);
-  }
+    setLoading(true);
+    setError("");
+    setNotFound(false);
 
-  const transactions = customer
-    ? getTransactionsForCustomer(customer.id).slice(0, 10)
-    : [];
+    try {
+      const result = await lookupCustomer(query);
+      setCustomer(result.customer);
+      setTransactions(result.transactions.slice(0, 10));
+    } catch (err) {
+      setCustomer(null);
+      setTransactions([]);
+      if (err instanceof Error && err.message === "Customer not found.") {
+        setNotFound(true);
+      } else {
+        setError(err instanceof Error ? err.message : "Lookup failed.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
     <div className="mx-auto w-full max-w-lg space-y-6">
@@ -66,17 +79,19 @@ export function CustomerLookupForm() {
                 onChange={(e) => {
                   setQuery(e.target.value);
                   setNotFound(false);
+                  setError("");
                 }}
                 placeholder="nicolas.manay@email.com or +63 917 123 4567"
               />
             </div>
+            {error && <p className="text-sm text-destructive">{error}</p>}
             <Button
               type="submit"
-              disabled={!isReady}
+              disabled={loading}
               className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
             >
               <Search className="size-4" />
-              {isReady ? "Look Up Points" : "Loading..."}
+              {loading ? "Searching..." : "Look Up Points"}
             </Button>
           </form>
         </CardContent>

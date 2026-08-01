@@ -1,0 +1,42 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Staff {
+  id           String   @id @default(cuid())
+  username     String   @unique
+  passwordHash String
+  name         String?
+  createdAt    DateTime @default(now())
+}
+
+model Customer {
+  id           String        @id
+  name         String
+  phone        String
+  email        String
+  points       Int           @default(0)
+  createdAt    DateTime      @default(now())
+  transactions Transaction[]
+
+  @@index([email])
+  @@index([phone])
+}
+
+model Transaction {
+  id         String   @id
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  type       String
+  points     Int
+  reason     String
+  createdAt  DateTime @default(now())
+
+  @@index([customerId])
+  @@index([createdAt])
+}
