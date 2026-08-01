@@ -1,0 +1,255 @@
+import { neon } from "@neondatabase/serverless";
+import bcrypt from "bcryptjs";
+import { DatabaseSync } from "node:sqlite";
+import { existsSync } from "node:fs";
+import { resolve } from "node:path";
+
+const databaseUrl = process.env.DATABASE_URL?.trim();
+if (!databaseUrl?.startsWith("postgres")) {
+  console.error("DATABASE_URL must be a Postgres connection string.");
+  process.exit(1);
+}
+
+const sql = neon(databaseUrl);
+
+const SCHEMA = `
+CREATE TABLE IF NOT EXISTS customers (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  phone TEXT NOT NULL,
+  email TEXT NOT NULL,
+  points INTEGER NOT NULL DEFAULT 0,
+  total_points_earned INTEGER NOT NULL DEFAULT 0,
+  consecutive_points_earned INTEGER NOT NULL DEFAULT 0,
+  vouchers_available INTEGER NOT NULL DEFAULT 0,
+  free_drink_vouchers_available INTEGER NOT NULL DEFAULT 0,
+  total_vouchers_earned INTEGER NOT NULL DEFAULT 0,
+  total_free_drink_vouchers_earned INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS transactions (
+  id TEXT PRIMARY KEY,
+  customer_id TEXT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+  type TEXT NOT NULL,
+  points INTEGER NOT NULL DEFAULT 0,
+  reason TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS transactions_customer_id_idx ON transactions(customer_id);
+CREATE INDEX IF NOT EXISTS transactions_created_at_idx ON transactions(created_at DESC);
+
+CREATE TABLE IF NOT EXISTS staff (
+  id TEXT PRIMARY KEY,
+  username TEXT NOT NULL UNIQUE,
+  password_hash TEXT NOT NULL,
+  name TEXT NOT NULL DEFAULT '',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS staff_sessions (
+  id TEXT PRIMARY KEY,
+  staff_id TEXT NOT NULL REFERENCES staff(id) ON DELETE CASCADE,
+  expires_at TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+`;
+
+const seedCustomer = {
+  id: "cust-001",
+  name: "Nicolas Noel Manay",
+  phone: "+63 917 123 4567",
+  email: "nicolas.manay@email.com",
+  points: 0,
+  total_points_earned: 0,
+  consecutive_points_earned: 0,
+  vouchers_available: 0,
+  free_drink_vouchers_available: 0,
+  total_vouchers_earned: 0,
+  total_free_drink_vouchers_earned: 0,
+  created_at: "2026-01-15T10:00:00.000Z",
+};
+
+function replayStreakState(transactions) {
+  let consecutive = 0;
+  let vouchers = 0;
+  let freeDrinkVouchers = 0;
+
+  for (const t of transactions) {
+    if (t.type === "earn") {
+      for (let i = 0; i < t.points; i++) {
+        consecutive += 1;
+        if (consecutive === 7) vouchers += 1;
+        else if (consecutive === 14) {
+          freeDrinkVouchers += 1;
+          consecutive = 0;
+        }
+      }
+    } else if (t.type === "redeem") {
+      consecutive = 0;
+    } else if (t.type === "voucher_redeem") {
+      vouchers = Math.max(0, vouchers - 1);
+    } else if (t.type === "free_drink_voucher_redeem") {
+      freeDrinkVouchers = Math.max(0, freeDrinkVouchers - 1);
+    }
+  }
+
+  return { consecutive, vouchers, freeDrinkVouchers };
+}
+
+function computeCustomerFields(customer, transactions) {
+  const customerTxns = transactions.filter((t) => t.customer_id === customer.id);
+  const totalPointsEarned = customerTxns
+    .filter((t) => t.type === "earn")
+    .reduce((sum, t) => sum + t.points, 0);
+  const totalVouchersEarned = customerTxns.filter((t) => t.type === "voucher_earn").length;
+  const totalFreeDrinkVouchersEarned = customerTxns.filter(
+    (t) => t.type === "free_drink_voucher_earn"
+  ).length;
+  const streak = replayStreakState(customerTxns);
+
+  return {
+    ...customer,
+    total_points_earned: totalPointsEarned,
+    consecutive_points_earned: streak.consecutive,
+    vouchers_available: streak.vouchers,
+    free_drink_vouchers_available: streak.freeDrinkVouchers,
+    total_vouchers_earned: totalVouchersEarned,
+    total_free_drink_vouchers_earned: totalFreeDrinkVouchersEarned,
+  };
+}
+
+function readSqliteData(dbPath) {
+  const db = new DatabaseSync(dbPath);
+  const tables = db
+    .prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
+    .all()
+    .map((t) => t.name);
+
+  if (!tables.includes("Customer")) return null;
+
+  const customers = db.prepare('SELECT * FROM "Customer"').all().map((row) => ({
+    id: row.id,
+    name: row.name,
+    phone: row.phone,
+    email: row.email,
+    points: row.points ?? 0,
+    created_at: row.createdAt ?? new Date().toISOString(),
+  }));
+
+  const transactions = tables.includes("Transaction")
+    ? db.prepare('SELECT * FROM "Transaction"').all().map((row) => ({
+        id: row.id,
+        customer_id: row.customerId,
+        type: row.type,
+        points: row.points ?? 0,
+        reason: row.reason,
+        created_at: row.createdAt ?? new Date().toISOString(),
+      }))
+    : [];
+
+  const staff = tables.includes("Staff")
+    ? db.prepare('SELECT * FROM "Staff"').all()
+    : [];
+
+  return { customers, transactions, staff };
+}
+
+async function ensureAdminStaff() {
+  const existing = await sql`SELECT id FROM staff WHERE username = 'admin'`;
+  if (existing.length > 0) {
+    console.log("Admin staff already exists.");
+    return;
+  }
+
+  const passwordHash = await bcrypt.hash("admib", 10);
+  await sql`
+    INSERT INTO staff (id, username, password_hash, name)
+    VALUES ('staff-admin', 'admin', ${passwordHash}, 'Administrator')
+  `;
+  console.log("Created admin staff (username: admin, password: admib).");
+}
+
+async function migrateCustomers(customers, transactions) {
+  for (const raw of customers) {
+    const customer = computeCustomerFields(raw, transactions);
+    await sql`
+      INSERT INTO customers (
+        id, name, phone, email, points, total_points_earned,
+        consecutive_points_earned, vouchers_available,
+        free_drink_vouchers_available, total_vouchers_earned,
+        total_free_drink_vouchers_earned, created_at
+      )
+      VALUES (
+        ${customer.id}, ${customer.name}, ${customer.phone}, ${customer.email},
+        ${customer.points}, ${customer.total_points_earned},
+        ${customer.consecutive_points_earned}, ${customer.vouchers_available},
+        ${customer.free_drink_vouchers_available}, ${customer.total_vouchers_earned},
+        ${customer.total_free_drink_vouchers_earned}, ${customer.created_at}
+      )
+      ON CONFLICT (id) DO NOTHING
+    `;
+  }
+
+  for (const txn of transactions) {
+    await sql`
+      INSERT INTO transactions (id, customer_id, type, points, reason, created_at)
+      VALUES (
+        ${txn.id}, ${txn.customer_id}, ${txn.type}, ${txn.points},
+        ${txn.reason}, ${txn.created_at}
+      )
+      ON CONFLICT (id) DO NOTHING
+    `;
+  }
+}
+
+console.log("Creating Neon schema...");
+for (const statement of SCHEMA.split(";").map((s) => s.trim()).filter(Boolean)) {
+  await sql.query(statement);
+}
+
+await ensureAdminStaff();
+
+const existingCustomers = await sql`SELECT COUNT(*)::int AS count FROM customers`;
+if (existingCustomers[0].count > 0) {
+  console.log(`Customers table already has ${existingCustomers[0].count} row(s). Skipping data migration.`);
+} else {
+  const sqlitePath = resolve("prisma/dev.db");
+  let imported = false;
+
+  if (existsSync(sqlitePath)) {
+    console.log(`Migrating from SQLite: ${sqlitePath}`);
+    const sqliteData = readSqliteData(sqlitePath);
+    if (sqliteData && sqliteData.customers.length > 0) {
+      await migrateCustomers(sqliteData.customers, sqliteData.transactions);
+      console.log(
+        `Migrated ${sqliteData.customers.length} customer(s) and ${sqliteData.transactions.length} transaction(s) from SQLite.`
+      );
+      imported = true;
+    }
+  }
+
+  if (!imported) {
+    console.log("Seeding default customer...");
+    await migrateCustomers([seedCustomer], []);
+    console.log("Seeded 1 default customer.");
+  }
+}
+
+const tables = await sql`
+  SELECT table_name
+  FROM information_schema.tables
+  WHERE table_schema = 'public'
+  ORDER BY table_name
+`;
+
+console.log("\nNeon database ready.");
+console.log("Tables:", tables.map((t) => t.table_name).join(", "));
+
+for (const { table_name } of tables) {
+  if (["staff_sessions"].includes(table_name)) continue;
+  const rows = await sql.query(`SELECT * FROM "${table_name}" LIMIT 20`);
+  console.log(`\n== ${table_name} (${rows.length} row(s)) ==`);
+  console.log(JSON.stringify(rows, null, 2));
+}

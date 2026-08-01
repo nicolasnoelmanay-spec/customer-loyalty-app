@@ -8,44 +8,54 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { authConfig, validateStaffCredentials } from "@/config/auth";
+import { apiGetSession, apiLogin, apiLogout } from "@/lib/api/loyalty-client";
 
 interface AuthContextValue {
   isReady: boolean;
   isAuthenticated: boolean;
-  login: (username: string, password: string) => boolean;
-  logout: () => void;
+  login: (username: string, password: string) => Promise<boolean>;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
-
-function readSession(): boolean {
-  if (typeof window === "undefined") return false;
-  return sessionStorage.getItem(authConfig.storageKey) === "authenticated";
-}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- read sessionStorage after mount
-    setIsAuthenticated(readSession());
-    setIsReady(true);
+    let cancelled = false;
+    apiGetSession()
+      .then((authenticated) => {
+        if (!cancelled) setIsAuthenticated(authenticated);
+      })
+      .catch(() => {
+        if (!cancelled) setIsAuthenticated(false);
+      })
+      .finally(() => {
+        if (!cancelled) setIsReady(true);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const login = useCallback((username: string, password: string) => {
-    if (!validateStaffCredentials(username, password)) {
+  const login = useCallback(async (username: string, password: string) => {
+    try {
+      await apiLogin(username, password);
+      setIsAuthenticated(true);
+      return true;
+    } catch {
       return false;
     }
-    sessionStorage.setItem(authConfig.storageKey, "authenticated");
-    setIsAuthenticated(true);
-    return true;
   }, []);
 
-  const logout = useCallback(() => {
-    sessionStorage.removeItem(authConfig.storageKey);
-    setIsAuthenticated(false);
+  const logout = useCallback(async () => {
+    try {
+      await apiLogout();
+    } finally {
+      setIsAuthenticated(false);
+    }
   }, []);
 
   return (

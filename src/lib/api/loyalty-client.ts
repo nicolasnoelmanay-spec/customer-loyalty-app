@@ -1,0 +1,172 @@
+import type {
+  CreateCustomerInput,
+  Customer,
+  LogPurchaseInput,
+  LoyaltyData,
+  RedeemFreeDrinkVoucherInput,
+  RedeemPointsInput,
+  RedeemVoucherInput,
+  Transaction,
+  UpdateCustomerInput,
+} from "@/types";
+
+async function parseJson<T>(response: Response): Promise<T> {
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(
+      typeof data.error === "string" ? data.error : "Request failed."
+    );
+  }
+  return data as T;
+}
+
+export async function fetchLoyaltyData(): Promise<LoyaltyData> {
+  const response = await fetch("/api/loyalty", { credentials: "include" });
+  return parseJson<LoyaltyData>(response);
+}
+
+export async function lookupCustomer(query: string): Promise<{
+  customer: Customer | null;
+  transactions: Transaction[];
+}> {
+  const response = await fetch(
+    `/api/lookup?q=${encodeURIComponent(query)}`,
+    { credentials: "include" }
+  );
+  return parseJson(response);
+}
+
+export async function apiAddCustomer(
+  input: CreateCustomerInput
+): Promise<Customer> {
+  const response = await fetch("/api/customers", {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  return parseJson(response);
+}
+
+export async function apiUpdateCustomer(
+  input: UpdateCustomerInput
+): Promise<Customer> {
+  const response = await fetch(`/api/customers/${input.customerId}`, {
+    method: "PATCH",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name: input.name,
+      phone: input.phone,
+      email: input.email,
+      points: input.points,
+    }),
+  });
+  return parseJson(response);
+}
+
+export async function apiLogPurchase(
+  input: LogPurchaseInput
+): Promise<Transaction> {
+  const response = await fetch(`/api/customers/${input.customerId}/purchase`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      drinkCount: input.drinkCount,
+      notes: input.notes,
+    }),
+  });
+  return parseJson(response);
+}
+
+export async function apiRedeemPoints(
+  input: RedeemPointsInput
+): Promise<Transaction> {
+  const response = await fetch(
+    `/api/customers/${input.customerId}/redeem-points`,
+    {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        points: input.points,
+        reason: input.reason,
+      }),
+    }
+  );
+  return parseJson(response);
+}
+
+export async function apiRedeemVoucher(
+  input: RedeemVoucherInput
+): Promise<Transaction> {
+  const response = await fetch(
+    `/api/customers/${input.customerId}/redeem-voucher`,
+    {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        count: input.count,
+        reason: input.reason,
+      }),
+    }
+  );
+  return parseJson(response);
+}
+
+export async function apiRedeemFreeDrinkVoucher(
+  input: RedeemFreeDrinkVoucherInput
+): Promise<Transaction> {
+  const response = await fetch(
+    `/api/customers/${input.customerId}/redeem-free-drink-voucher`,
+    {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        count: input.count,
+        reason: input.reason,
+      }),
+    }
+  );
+  return parseJson(response);
+}
+
+export async function apiClearTransactionHistory(): Promise<void> {
+  const response = await fetch("/api/transactions", {
+    method: "DELETE",
+    credentials: "include",
+  });
+  await parseJson(response);
+}
+
+export async function apiLogin(
+  username: string,
+  password: string
+): Promise<void> {
+  const response = await fetch("/api/auth/login", {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, password }),
+  });
+  await parseJson(response);
+}
+
+export async function apiLogout(): Promise<void> {
+  const response = await fetch("/api/auth/logout", {
+    method: "POST",
+    credentials: "include",
+  });
+  await parseJson(response);
+}
+
+export async function apiGetSession(): Promise<boolean> {
+  const response = await fetch("/api/auth/session", {
+    credentials: "include",
+  });
+  const data = await parseJson<{ authenticated: boolean }>(response);
+  return data.authenticated;
+}

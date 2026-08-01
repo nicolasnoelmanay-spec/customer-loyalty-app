@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ArrowDownLeft, ArrowUpRight, Coffee, Search, Sparkles, Ticket } from "lucide-react";
 import { formatTransactionDate } from "@/lib/format-date";
 import { formatStreakProgress, loyaltyConfig } from "@/config/loyalty";
+import { lookupCustomer } from "@/lib/api/loyalty-client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,26 +24,34 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useLoyalty } from "@/hooks/use-loyalty";
-import type { Customer } from "@/types";
+import type { Customer, Transaction } from "@/types";
 
 export function CustomerLookupForm() {
-  const { isReady, findCustomerByContact, getTransactionsForCustomer } = useLoyalty();
   const [query, setQuery] = useState("");
   const [customer, setCustomer] = useState<Customer | null>(null);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [notFound, setNotFound] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  function handleSearch(e: React.FormEvent) {
+  async function handleSearch(e: React.FormEvent) {
     e.preventDefault();
-    if (!isReady) return;
-    const found = findCustomerByContact(query);
-    setCustomer(found ?? null);
-    setNotFound(!found);
-  }
+    if (!query.trim()) return;
 
-  const transactions = customer
-    ? getTransactionsForCustomer(customer.id).slice(0, 10)
-    : [];
+    setLoading(true);
+    setNotFound(false);
+    try {
+      const result = await lookupCustomer(query);
+      setCustomer(result.customer);
+      setTransactions(result.transactions.slice(0, 10));
+      setNotFound(!result.customer);
+    } catch {
+      setCustomer(null);
+      setTransactions([]);
+      setNotFound(true);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
     <div className="mx-auto w-full max-w-lg space-y-6">
@@ -72,11 +81,11 @@ export function CustomerLookupForm() {
             </div>
             <Button
               type="submit"
-              disabled={!isReady}
+              disabled={loading}
               className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
             >
               <Search className="size-4" />
-              {isReady ? "Look Up Points" : "Loading..."}
+              {loading ? "Searching..." : "Look Up Points"}
             </Button>
           </form>
         </CardContent>

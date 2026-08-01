@@ -5,12 +5,20 @@ import {
   useCallback,
   useContext,
   useEffect,
-  useReducer,
   useState,
   type ReactNode,
 } from "react";
-import { createLoyaltyRepository } from "@/lib/data";
-import type { LoyaltyRepository } from "@/lib/data/types";
+import {
+  apiAddCustomer,
+  apiClearTransactionHistory,
+  apiLogPurchase,
+  apiRedeemFreeDrinkVoucher,
+  apiRedeemPoints,
+  apiRedeemVoucher,
+  apiUpdateCustomer,
+  fetchLoyaltyData,
+} from "@/lib/api/loyalty-client";
+import { useAuth } from "@/hooks/use-auth";
 import type {
   CreateCustomerInput,
   Customer,
@@ -26,14 +34,16 @@ interface LoyaltyContextValue {
   isReady: boolean;
   customers: Customer[];
   transactions: Transaction[];
-  refresh: () => void;
-  addCustomer: (input: CreateCustomerInput) => Customer;
-  updateCustomer: (input: UpdateCustomerInput) => Customer;
-  logPurchase: (input: LogPurchaseInput) => Transaction;
-  redeemPoints: (input: RedeemPointsInput) => Transaction;
-  redeemVoucher: (input: RedeemVoucherInput) => Transaction;
-  redeemFreeDrinkVoucher: (input: RedeemFreeDrinkVoucherInput) => Transaction;
-  clearTransactionHistory: () => void;
+  refresh: () => Promise<void>;
+  addCustomer: (input: CreateCustomerInput) => Promise<Customer>;
+  updateCustomer: (input: UpdateCustomerInput) => Promise<Customer>;
+  logPurchase: (input: LogPurchaseInput) => Promise<Transaction>;
+  redeemPoints: (input: RedeemPointsInput) => Promise<Transaction>;
+  redeemVoucher: (input: RedeemVoucherInput) => Promise<Transaction>;
+  redeemFreeDrinkVoucher: (
+    input: RedeemFreeDrinkVoucherInput
+  ) => Promise<Transaction>;
+  clearTransactionHistory: () => Promise<void>;
   findCustomerByContact: (phoneOrEmail: string) => Customer | undefined;
   getCustomerById: (id: string) => Customer | undefined;
   getTransactionsForCustomer: (customerId: string) => Transaction[];
@@ -45,88 +55,116 @@ function notReady(): never {
   throw new Error("Loyalty data is not loaded yet.");
 }
 
-const emptyValue = (refresh: () => void): LoyaltyContextValue => ({
-  isReady: false,
-  customers: [],
-  transactions: [],
-  refresh,
-  addCustomer: notReady,
-  updateCustomer: notReady,
-  logPurchase: notReady,
-  redeemPoints: notReady,
-  redeemVoucher: notReady,
-  redeemFreeDrinkVoucher: notReady,
-  clearTransactionHistory: notReady,
-  findCustomerByContact: () => undefined,
-  getCustomerById: () => undefined,
-  getTransactionsForCustomer: () => [],
-});
-
-function buildValue(
-  repository: LoyaltyRepository,
-  refresh: () => void
-): LoyaltyContextValue {
-  return {
-    isReady: true,
-    customers: repository.getCustomers(),
-    transactions: repository.getTransactions(),
-    refresh,
-    addCustomer: (input) => {
-      const customer = repository.addCustomer(input);
-      refresh();
-      return customer;
-    },
-    updateCustomer: (input) => {
-      const customer = repository.updateCustomer(input);
-      refresh();
-      return customer;
-    },
-    logPurchase: (input) => {
-      const txn = repository.logPurchase(input);
-      refresh();
-      return txn;
-    },
-    redeemPoints: (input) => {
-      const txn = repository.redeemPoints(input);
-      refresh();
-      return txn;
-    },
-    redeemVoucher: (input) => {
-      const txn = repository.redeemVoucher(input);
-      refresh();
-      return txn;
-    },
-    redeemFreeDrinkVoucher: (input) => {
-      const txn = repository.redeemFreeDrinkVoucher(input);
-      refresh();
-      return txn;
-    },
-    clearTransactionHistory: () => {
-      repository.clearTransactionHistory();
-      refresh();
-    },
-    findCustomerByContact: (phoneOrEmail) =>
-      repository.findCustomerByContact(phoneOrEmail),
-    getCustomerById: (id) => repository.getCustomerById(id),
-    getTransactionsForCustomer: (customerId) =>
-      repository.getTransactionsForCustomer(customerId),
-  };
-}
-
 export function LoyaltyProvider({ children }: { children: ReactNode }) {
-  const [repository, setRepository] = useState<LoyaltyRepository | null>(null);
-  const [, rerender] = useReducer((n: number) => n + 1, 0);
+  const { isAuthenticated, isReady: authReady } = useAuth();
+  const [isReady, setIsReady] = useState(false);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
 
-  const refresh = useCallback(() => rerender(), []);
+  const refresh = useCallback(async () => {
+    if (!isAuthenticated) {
+      setCustomers([]);
+      setTransactions([]);
+      return;
+    }
+
+    const data = await fetchLoyaltyData();
+    setCustomers(data.customers);
+    setTransactions(data.transactions);
+  }, [isAuthenticated]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- defer localStorage read until after hydration
-    setRepository(createLoyaltyRepository());
-  }, []);
+    if (!authReady) return;
 
-  const value = repository
-    ? buildValue(repository, refresh)
-    : emptyValue(refresh);
+    if (!isAuthenticated) {
+      setCustomers([]);
+      setTransactions([]);
+      setIsReady(true);
+      return;
+    }
+
+    let cancelled = false;
+    setIsReady(false);
+    fetchLoyaltyData()
+      .then((data) => {
+        if (!cancelled) {
+          setCustomers(data.customers);
+          setTransactions(data.transactions);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setCustomers([]);
+          setTransactions([]);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setIsReady(true);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authReady, isAuthenticated]);
+
+  const value: LoyaltyContextValue = {
+    isReady: authReady && isReady,
+    customers,
+    transactions,
+    refresh,
+    addCustomer: async (input) => {
+      if (!isReady || !isAuthenticated) notReady();
+      const customer = await apiAddCustomer(input);
+      await refresh();
+      return customer;
+    },
+    updateCustomer: async (input) => {
+      if (!isReady || !isAuthenticated) notReady();
+      const customer = await apiUpdateCustomer(input);
+      await refresh();
+      return customer;
+    },
+    logPurchase: async (input) => {
+      if (!isReady || !isAuthenticated) notReady();
+      const txn = await apiLogPurchase(input);
+      await refresh();
+      return txn;
+    },
+    redeemPoints: async (input) => {
+      if (!isReady || !isAuthenticated) notReady();
+      const txn = await apiRedeemPoints(input);
+      await refresh();
+      return txn;
+    },
+    redeemVoucher: async (input) => {
+      if (!isReady || !isAuthenticated) notReady();
+      const txn = await apiRedeemVoucher(input);
+      await refresh();
+      return txn;
+    },
+    redeemFreeDrinkVoucher: async (input) => {
+      if (!isReady || !isAuthenticated) notReady();
+      const txn = await apiRedeemFreeDrinkVoucher(input);
+      await refresh();
+      return txn;
+    },
+    clearTransactionHistory: async () => {
+      if (!isReady || !isAuthenticated) notReady();
+      await apiClearTransactionHistory();
+      await refresh();
+    },
+    findCustomerByContact: (phoneOrEmail) => {
+      const query = phoneOrEmail.trim().toLowerCase();
+      return customers.find(
+        (c) =>
+          c.phone.toLowerCase().includes(query) ||
+          c.email.toLowerCase() === query
+      );
+    },
+    getCustomerById: (id) => customers.find((c) => c.id === id),
+    getTransactionsForCustomer: (customerId) =>
+      transactions.filter((t) => t.customerId === customerId),
+  };
 
   return (
     <LoyaltyContext.Provider value={value}>{children}</LoyaltyContext.Provider>
