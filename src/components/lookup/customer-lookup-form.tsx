@@ -157,6 +157,7 @@ export function CustomerLookupForm() {
                 customerId={customer.id}
                 customerName={customer.name}
                 size={220}
+                showDownload
               />
             </CardContent>
           </Card>

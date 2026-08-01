@@ -45,6 +45,7 @@ export function CustomerQrDialog({
             customerId={customer.id}
             customerName={customer.name}
             size={280}
+            showDownload
           />
           <p className="text-center text-sm text-muted-foreground">
             {loyaltyConfig.programName}
