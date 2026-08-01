@@ -55,8 +55,27 @@ export interface UpdateCustomerInput {
 
 export interface LogPurchaseInput {
   customerId: string;
-  drinkCount: number;
+  drinkCount?: number;
+  items?: PurchaseItemInput[];
   notes?: string;
+}
+
+export type ProductCategory = "drink" | "snack";
+
+export interface Product {
+  id: string;
+  name: string;
+  category: ProductCategory;
+  price: number;
+  pointsEarned: number;
+  description: string;
+  active: boolean;
+  sortOrder: number;
+}
+
+export interface PurchaseItemInput {
+  productId: string;
+  quantity: number;
 }
 
 export interface RedeemPointsInput {

@@ -5,6 +5,8 @@
 export const loyaltyConfig = {
   /** Points earned per coffee drink purchased */
   pointsPerDrink: 1,
+  /** Drinks below this price (PHP) do not earn loyalty points */
+  minDrinkPriceForPoints: 100,
   /** Singular label shown in the UI */
   drinkLabel: "coffee drink",
   /** Plural label shown in the UI */

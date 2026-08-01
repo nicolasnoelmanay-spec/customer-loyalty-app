@@ -166,9 +166,14 @@ export class LocalStorageLoyaltyRepository implements LoyaltyRepository {
     const customer = this.getCustomerById(input.customerId);
     if (!customer) throw new Error("Customer not found");
 
-    const points = calculatePointsFromDrinks(input.drinkCount);
+    const drinkCount = input.drinkCount;
+    if (typeof drinkCount !== "number" || !Number.isInteger(drinkCount) || drinkCount <= 0) {
+      throw new Error("Enter a valid number of coffee drinks.");
+    }
+
+    const points = calculatePointsFromDrinks(drinkCount);
     const notes = input.notes?.trim();
-    const drinkSummary = formatDrinkCount(input.drinkCount);
+    const drinkSummary = formatDrinkCount(drinkCount);
     const reason = notes ? `${drinkSummary} — ${notes}` : drinkSummary;
 
     const transaction: Transaction = {

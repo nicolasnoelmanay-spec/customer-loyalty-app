@@ -17,15 +17,36 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     const { id } = await params;
     const body = await request.json();
-    const drinkCount = body.drinkCount;
     const notes = body.notes?.trim();
+    const items = body.items;
+    const drinkCount = body.drinkCount;
+
+    if (Array.isArray(items) && items.length > 0) {
+      for (const item of items) {
+        if (
+          typeof item.productId !== "string" ||
+          typeof item.quantity !== "number" ||
+          !Number.isInteger(item.quantity) ||
+          item.quantity <= 0
+        ) {
+          return jsonError("Each item needs a productId and positive quantity.", 400);
+        }
+      }
+
+      const transaction = await logPurchase({
+        customerId: id,
+        items,
+        notes,
+      });
+      return NextResponse.json(transaction, { status: 201 });
+    }
 
     if (
       typeof drinkCount !== "number" ||
       !Number.isInteger(drinkCount) ||
       drinkCount <= 0
     ) {
-      return jsonError("drinkCount must be a positive integer.", 400);
+      return jsonError("Provide items or a positive drinkCount.", 400);
     }
 
     const transaction = await logPurchase({

@@ -10,7 +10,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils";
 
 interface AppHeaderProps {
-  active?: "home" | "dashboard" | "lookup" | "login";
+  active?: "home" | "dashboard" | "products" | "lookup" | "login";
 }
 
 export function AppHeader({ active }: AppHeaderProps) {
@@ -50,6 +50,19 @@ export function AppHeader({ active }: AppHeaderProps) {
           >
             Dashboard
           </Link>
+          {isReady && isAuthenticated && (
+            <Link
+              href="/products"
+              className={cn(
+                buttonVariants({
+                  variant: active === "products" ? "secondary" : "ghost",
+                  size: "sm",
+                })
+              )}
+            >
+              Products
+            </Link>
+          )}
           <Link
             href="/lookup"
             className={cn(
@@ -61,7 +74,7 @@ export function AppHeader({ active }: AppHeaderProps) {
           >
             Customer Lookup
           </Link>
-          {isReady && isAuthenticated && active === "dashboard" && (
+          {isReady && isAuthenticated && (active === "dashboard" || active === "products") && (
             <Button variant="ghost" size="sm" onClick={handleLogout}>
               <LogOut className="size-4" />
               Logout

@@ -10,6 +10,7 @@ import type {
   Customer,
   LogPurchaseInput,
   LoyaltyData,
+  Product,
   RedeemFreeDrinkVoucherInput,
   RedeemPointsInput,
   RedeemVoucherInput,
@@ -23,6 +24,11 @@ import {
   type CustomerRow,
   type TransactionRow,
 } from "./neon-mappers";
+import { mapProduct, type ProductRow } from "./product-mappers";
+import {
+  calculatePurchaseTotals,
+  formatCurrency,
+} from "./purchase-calculations";
 
 async function fetchCustomers(): Promise<Customer[]> {
   const sql = getSql();
@@ -144,16 +150,65 @@ export async function updateCustomer(
   return mapCustomer((results[0] as CustomerRow[])[0] as CustomerRow);
 }
 
+export async function getProducts(): Promise<Product[]> {
+  const sql = getSql();
+  const rows = await sql`
+    SELECT *
+    FROM products
+    WHERE active = TRUE
+    ORDER BY sort_order ASC, name ASC
+  `;
+  return (rows as ProductRow[]).map(mapProduct);
+}
+
 export async function logPurchase(
   input: LogPurchaseInput
 ): Promise<Transaction> {
   const customer = await getCustomerRow(input.customerId);
   if (!customer) throw new Error("Customer not found");
 
-  const points = calculatePointsFromDrinks(input.drinkCount);
   const notes = input.notes?.trim();
-  const drinkSummary = formatDrinkCount(input.drinkCount);
-  const reason = notes ? `${drinkSummary} — ${notes}` : drinkSummary;
+  let points: number;
+  let reason: string;
+
+  if (input.items && input.items.length > 0) {
+    const selectedItems = input.items.filter((item) => item.quantity > 0);
+    if (selectedItems.length === 0) {
+      throw new Error("Add at least one product.");
+    }
+
+    for (const item of selectedItems) {
+      if (!Number.isInteger(item.quantity) || item.quantity <= 0) {
+        throw new Error("Invalid product quantity.");
+      }
+    }
+
+    const catalog = await getProducts();
+    const productIds = new Set(selectedItems.map((item) => item.productId));
+    const products = catalog.filter((product) => productIds.has(product.id));
+
+    if (products.length !== productIds.size) {
+      throw new Error("One or more products were not found.");
+    }
+
+    const totals = calculatePurchaseTotals(selectedItems, products);
+    points = totals.pointsEarned;
+    reason = `${totals.summary} (${formatCurrency(totals.subtotal)})`;
+    if (notes) reason += ` — ${notes}`;
+  } else {
+    const drinkCount = input.drinkCount;
+    if (
+      typeof drinkCount !== "number" ||
+      !Number.isInteger(drinkCount) ||
+      drinkCount <= 0
+    ) {
+      throw new Error("Enter a valid purchase.");
+    }
+
+    points = calculatePointsFromDrinks(drinkCount);
+    const drinkSummary = formatDrinkCount(drinkCount);
+    reason = notes ? `${drinkSummary} — ${notes}` : drinkSummary;
+  }
 
   const transactionId = generateId("txn");
   const newTotalPointsEarned = Number(customer.total_points_earned) + points;

@@ -3,6 +3,8 @@ import type {
   Customer,
   LogPurchaseInput,
   LoyaltyData,
+  Product,
+  PurchaseItemInput,
   RedeemFreeDrinkVoucherInput,
   RedeemPointsInput,
   RedeemVoucherInput,
@@ -65,6 +67,12 @@ export async function apiUpdateCustomer(
   return parseJson(response);
 }
 
+export async function fetchProducts(): Promise<Product[]> {
+  const response = await fetch("/api/products");
+  const data = await parseJson<{ products: Product[] }>(response);
+  return data.products;
+}
+
 export async function apiLogPurchase(
   input: LogPurchaseInput
 ): Promise<Transaction> {
@@ -74,6 +82,7 @@ export async function apiLogPurchase(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       drinkCount: input.drinkCount,
+      items: input.items,
       notes: input.notes,
     }),
   });
