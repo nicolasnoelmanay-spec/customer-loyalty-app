@@ -76,10 +76,3 @@ export interface RedeemFreeDrinkVoucherInput {
   count?: number;
   reason?: string;
 }
-
-export interface Staff {
-  id: string;
-  username: string;
-  name: string | null;
-  createdAt: string;
-}

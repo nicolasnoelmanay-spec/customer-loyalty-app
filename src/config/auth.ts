@@ -1,5 +1,15 @@
-/** Default staff account created when no staff users exist in the database. */
 export const authConfig = {
-  defaultUsername: "admin",
-  defaultName: "Admin",
+  username: "admin",
+  password: "admib",
+  storageKey: "loyalty-admin-auth",
 } as const;
+
+export function validateStaffCredentials(
+  username: string,
+  password: string
+): boolean {
+  return (
+    username.trim() === authConfig.username &&
+    password === authConfig.password
+  );
+}

@@ -8,58 +8,49 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import {
-  fetchStaffSession,
-  loginStaff,
-  logoutStaff,
-  type StaffUser,
-} from "@/lib/api/loyalty-client";
+import { authConfig, validateStaffCredentials } from "@/config/auth";
 
 interface AuthContextValue {
   isReady: boolean;
   isAuthenticated: boolean;
-  staff: StaffUser | null;
-  login: (username: string) => Promise<boolean>;
-  logout: () => Promise<void>;
+  login: (username: string, password: string) => boolean;
+  logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+function readSession(): boolean {
+  if (typeof window === "undefined") return false;
+  return sessionStorage.getItem(authConfig.storageKey) === "authenticated";
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isReady, setIsReady] = useState(false);
-  const [staff, setStaff] = useState<StaffUser | null>(null);
 
   useEffect(() => {
-    fetchStaffSession()
-      .then(setStaff)
-      .catch(() => setStaff(null))
-      .finally(() => setIsReady(true));
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- read sessionStorage after mount
+    setIsAuthenticated(readSession());
+    setIsReady(true);
   }, []);
 
-  const login = useCallback(async (username: string) => {
-    try {
-      const session = await loginStaff(username);
-      setStaff(session);
-      return true;
-    } catch {
+  const login = useCallback((username: string, password: string) => {
+    if (!validateStaffCredentials(username, password)) {
       return false;
     }
+    sessionStorage.setItem(authConfig.storageKey, "authenticated");
+    setIsAuthenticated(true);
+    return true;
   }, []);
 
-  const logout = useCallback(async () => {
-    await logoutStaff();
-    setStaff(null);
+  const logout = useCallback(() => {
+    sessionStorage.removeItem(authConfig.storageKey);
+    setIsAuthenticated(false);
   }, []);
 
   return (
     <AuthContext.Provider
-      value={{
-        isReady,
-        isAuthenticated: staff !== null,
-        staff,
-        login,
-        logout,
-      }}
+      value={{ isReady, isAuthenticated, login, logout }}
     >
       {children}
     </AuthContext.Provider>

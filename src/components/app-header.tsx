@@ -20,8 +20,8 @@ export function AppHeader({ active }: AppHeaderProps) {
   const dashboardHref =
     isReady && isAuthenticated ? "/dashboard" : "/login";
 
-  async function handleLogout() {
-    await logout();
+  function handleLogout() {
+    logout();
     router.push("/login");
   }
 
