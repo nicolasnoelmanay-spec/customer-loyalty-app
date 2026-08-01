@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Pencil, Users } from "lucide-react";
+import { Pencil, QrCode, Users } from "lucide-react";
 import { EditCustomerDialog } from "@/components/dashboard/edit-customer-dialog";
+import { CustomerQrDialog } from "@/components/qr/customer-qr-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -26,6 +27,7 @@ import type { Customer } from "@/types";
 export function CustomerDirectory() {
   const { customers } = useLoyalty();
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+  const [qrCustomer, setQrCustomer] = useState<Customer | null>(null);
 
   return (
     <>
@@ -52,7 +54,7 @@ export function CustomerDirectory() {
                   <TableHead className="hidden lg:table-cell text-right">Streak</TableHead>
                   <TableHead className="hidden lg:table-cell text-right">50% Stack</TableHead>
                   <TableHead className="hidden lg:table-cell text-right">Free Drink Stack</TableHead>
-                  <TableHead className="w-12">
+                  <TableHead className="w-24">
                     <span className="sr-only">Actions</span>
                   </TableHead>
                 </TableRow>
@@ -107,14 +109,24 @@ export function CustomerDirectory() {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          aria-label={`Edit ${customer.name}`}
-                          onClick={() => setEditingCustomer(customer)}
-                        >
-                          <Pencil className="size-4" />
-                        </Button>
+                        <div className="flex justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            aria-label={`Show QR code for ${customer.name}`}
+                            onClick={() => setQrCustomer(customer)}
+                          >
+                            <QrCode className="size-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            aria-label={`Edit ${customer.name}`}
+                            onClick={() => setEditingCustomer(customer)}
+                          >
+                            <Pencil className="size-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))
@@ -130,6 +142,14 @@ export function CustomerDirectory() {
         open={editingCustomer !== null}
         onOpenChange={(open) => {
           if (!open) setEditingCustomer(null);
+        }}
+      />
+
+      <CustomerQrDialog
+        customer={qrCustomer}
+        open={qrCustomer !== null}
+        onOpenChange={(open) => {
+          if (!open) setQrCustomer(null);
         }}
       />
     </>

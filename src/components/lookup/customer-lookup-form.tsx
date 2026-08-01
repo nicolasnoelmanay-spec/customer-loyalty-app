@@ -1,10 +1,19 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowDownLeft, ArrowUpRight, Coffee, Search, Sparkles, Ticket } from "lucide-react";
+import {
+  ArrowDownLeft,
+  ArrowUpRight,
+  Coffee,
+  QrCode,
+  Search,
+  Sparkles,
+  Ticket,
+} from "lucide-react";
 import { formatTransactionDate } from "@/lib/format-date";
 import { formatStreakProgress, loyaltyConfig } from "@/config/loyalty";
 import { lookupCustomer } from "@/lib/api/loyalty-client";
+import { CustomerQrImage } from "@/components/qr/customer-qr-image";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -130,6 +139,25 @@ export function CustomerLookupForm() {
               <p className="text-xs text-muted-foreground mt-3">
                 Streak: {formatStreakProgress(customer.consecutivePointsEarned)}
               </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="text-center">
+              <CardTitle className="flex items-center justify-center gap-2 text-base">
+                <QrCode className="size-5" />
+                Your Loyalty QR Code
+              </CardTitle>
+              <CardDescription>
+                Show this at the counter so staff can scan you in quickly.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col items-center pb-6">
+              <CustomerQrImage
+                customerId={customer.id}
+                customerName={customer.name}
+                size={220}
+              />
             </CardContent>
           </Card>
 

@@ -40,6 +40,10 @@ export const loyaltyConfig = {
   streakResetReason: "Streak completed — 14 points reset",
   /** localStorage key for persisted data */
   storageKey: "loyalty-points-tracker-data-v2",
+  /** Customer QR code payload prefix */
+  qr: {
+    prefix: "coffeesentials://customer/",
+  },
 } as const;
 
 export function calculatePointsFromDrinks(drinkCount: number): number {

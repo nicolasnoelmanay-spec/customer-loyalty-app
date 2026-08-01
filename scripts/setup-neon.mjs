@@ -163,12 +163,12 @@ async function ensureAdminStaff() {
     return;
   }
 
-  const passwordHash = await bcrypt.hash("admib", 10);
+  const passwordHash = await bcrypt.hash("12345", 10);
   await sql`
     INSERT INTO staff (id, username, password_hash, name)
     VALUES ('staff-admin', 'admin', ${passwordHash}, 'Administrator')
   `;
-  console.log("Created admin staff (username: admin, password: admib).");
+  console.log("Created admin staff (username: admin, password: 12345).");
 }
 
 async function migrateCustomers(customers, transactions) {

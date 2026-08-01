@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Coffee } from "lucide-react";
 import { loyaltyConfig, calculatePointsFromDrinks, applyStreakPointsEarned } from "@/config/loyalty";
+import { CustomerSelectField } from "@/components/dashboard/customer-select-field";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -15,13 +16,6 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useLoyalty } from "@/hooks/use-loyalty";
 
@@ -90,23 +84,12 @@ export function LogPurchaseDialog() {
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label>Customer</Label>
-              <Select value={customerId} onValueChange={(v) => setCustomerId(v ?? "")}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select customer...">
-                    {selectedCustomer?.name}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {customers.map((c) => (
-                    <SelectItem key={c.id} value={c.id} label={c.name}>
-                      {c.name} ({c.points} pts)
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <CustomerSelectField
+              customerId={customerId}
+              customers={customers}
+              onCustomerIdChange={setCustomerId}
+              onScanError={setError}
+            />
             <div className="grid gap-2">
               <Label htmlFor="drinkCount">Coffee Drinks</Label>
               <Input

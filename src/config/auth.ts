@@ -1,6 +1,6 @@
 export const authConfig = {
   username: "admin",
-  password: "admib",
+  password: "12345",
   storageKey: "loyalty-admin-auth",
 } as const;
 
