@@ -2,9 +2,9 @@ import { after } from "next/server";
 import { loyaltyConfig } from "@/config/loyalty";
 import { sendEmail } from "@/lib/email/send-email";
 
-/** Public site URL used in welcome emails for new members. */
-export const WELCOME_EMAIL_MEMBER_URL =
-  "https://loyaltyprogram.coffeesentials.online/login?join=1";
+/** Canonical member login link used in welcome emails. */
+export const MEMBER_WELCOME_LOGIN_URL =
+  "https://loyaltyprogram.coffeesentials.online/login?customer=1";
 
 export interface WelcomeEmailInput {
   name: string;
@@ -21,7 +21,7 @@ function escapeHtml(value: string): string {
 }
 
 function buildWelcomeEmailContent(input: WelcomeEmailInput) {
-  const memberUrl = WELCOME_EMAIL_MEMBER_URL;
+  const loginUrl = MEMBER_WELCOME_LOGIN_URL;
   const brandName = loyaltyConfig.email.brandName;
   const programName = loyaltyConfig.programName;
   const subject = `Welcome to ${brandName}`;
@@ -38,8 +38,8 @@ function buildWelcomeEmailContent(input: WelcomeEmailInput) {
     `- Collect ${loyaltyConfig.voucher.pointsPerVoucher} consecutive points for a ${loyaltyConfig.voucher.label}.`,
     `- Reach ${loyaltyConfig.streak.cycleLength} consecutive points for a ${loyaltyConfig.freeDrinkVoucher.label}.`,
     "",
-    "Show your member QR code at the counter when you order, or visit:",
-    memberUrl,
+    "Show your member QR code at the counter when you order, or sign in anytime:",
+    loginUrl,
     "",
     `See you at ${brandName}!`,
   ].join("\n");
@@ -56,7 +56,7 @@ function buildWelcomeEmailContent(input: WelcomeEmailInput) {
     </ul>
     <p>
       Show your member QR code at the counter when you order, or
-      <a href="${memberUrl}">visit the loyalty program</a>.
+      <a href="${loginUrl}">sign in to your account</a> anytime.
     </p>
     <p>See you at ${escapeHtml(brandName)}!</p>
   `.trim();
