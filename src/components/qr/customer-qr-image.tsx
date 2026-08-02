@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { Download } from "lucide-react";
-import QRCode from "qrcode";
-import { buildCustomerQrPayload } from "@/lib/qr/customer-qr";
+import {
+  createCustomerQrCardDataUrl,
+  getCustomerQrCardDimensions,
+} from "@/lib/qr/customer-qr-card";
 import {
   downloadQrImage,
   getQrDownloadButtonLabel,
@@ -28,17 +30,6 @@ function defaultDownloadFileName(customerId: string, customerName: string) {
   return safeName ? `${safeName}-${customerId}-qr.png` : `${customerId}-qr.png`;
 }
 
-async function createCustomerQrDataUrl(customerId: string, size: number) {
-  return QRCode.toDataURL(buildCustomerQrPayload(customerId), {
-    width: size,
-    margin: 2,
-    color: {
-      dark: "#4A2C17",
-      light: "#FFFDF8",
-    },
-  });
-}
-
 export function CustomerQrImage({
   customerId,
   customerName,
@@ -55,7 +46,7 @@ export function CustomerQrImage({
   useEffect(() => {
     let cancelled = false;
 
-    createCustomerQrDataUrl(customerId, size)
+    createCustomerQrCardDataUrl(customerId, customerName, size)
       .then((url) => {
         if (!cancelled) setDataUrl(url);
       })
@@ -66,7 +57,7 @@ export function CustomerQrImage({
     return () => {
       cancelled = true;
     };
-  }, [customerId, size]);
+  }, [customerId, customerName, size]);
 
   useEffect(() => {
     setDownloadLabel(getQrDownloadButtonLabel());
@@ -92,11 +83,12 @@ export function CustomerQrImage({
   }
 
   if (!dataUrl) {
+    const cardSize = getCustomerQrCardDimensions(size);
     return (
       <div className="flex flex-col items-center gap-3">
         <div
           className="flex items-center justify-center rounded-xl border bg-muted text-sm text-muted-foreground"
-          style={{ width: size, height: size }}
+          style={{ width: cardSize.width, height: cardSize.height }}
         >
           Loading QR…
         </div>
@@ -104,15 +96,17 @@ export function CustomerQrImage({
     );
   }
 
+  const cardSize = getCustomerQrCardDimensions(size);
+
   return (
     <div className="flex w-full max-w-full flex-col items-center gap-3">
-      {/* eslint-disable-next-line @next/next/no-img-element -- QR data URL */}
+      {/* eslint-disable-next-line @next/next/no-img-element -- QR card data URL */}
       <img
         src={dataUrl}
         alt={`QR code for ${customerName}`}
-        className="max-w-full rounded-xl border bg-white p-3 shadow-sm"
-        width={size}
-        height={size}
+        className="max-w-full rounded-xl border bg-white shadow-sm"
+        width={cardSize.width}
+        height={cardSize.height}
       />
       {showDownload && (
         <div className="flex w-full max-w-sm flex-col items-center gap-2">
@@ -145,7 +139,7 @@ export async function downloadCustomerQrCode(
   size = 280,
   downloadFileName?: string
 ) {
-  const dataUrl = await createCustomerQrDataUrl(customerId, size);
+  const dataUrl = await createCustomerQrCardDataUrl(customerId, customerName, size);
   const fileName =
     downloadFileName ?? defaultDownloadFileName(customerId, customerName);
   await downloadQrImage(dataUrl, fileName);
