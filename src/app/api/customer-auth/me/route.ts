@@ -26,7 +26,7 @@ export async function GET() {
     ]);
     return NextResponse.json({
       customer,
-      transactions: transactions.slice(0, 10),
+      transactions,
       totalVoucherSavings,
     });
   } catch (error) {

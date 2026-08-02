@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { formatTransactionDate } from "@/lib/format-date";
 import { formatStreakProgress, loyaltyConfig } from "@/config/loyalty";
-import { usePagination } from "@/hooks/use-pagination";
+import { usePagination, CUSTOMER_PAGE_SIZE } from "@/hooks/use-pagination";
 import { CustomerQrImage } from "@/components/qr/customer-qr-image";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -46,7 +46,7 @@ export function CustomerAccountDetails({
     totalPages,
     pageSize,
     totalItems,
-  } = usePagination(transactions, 10, customer.id);
+  } = usePagination(transactions, CUSTOMER_PAGE_SIZE, customer.id);
 
   return (
     <>

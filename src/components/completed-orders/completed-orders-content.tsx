@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   CheckCircle2,
   Coins,
+  Download,
   ShoppingBag,
   Ticket,
   TrendingUp,
@@ -45,8 +46,11 @@ import {
   type ManilaYmd,
 } from "@/lib/completed-order-period";
 import { formatTransactionDate } from "@/lib/format-date";
+import { exportCompletedOrdersToExcel } from "@/lib/export/completed-orders-excel";
+import { usePagination, CUSTOMER_PAGE_SIZE } from "@/hooks/use-pagination";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
+import { ListPagination } from "@/components/ui/list-pagination";
 import type { CompletedOrder, Product, PurchaseItemInput } from "@/types";
 
 function cartProductsFromItems(items: PurchaseItemInput[], products: Product[]) {
@@ -176,6 +180,14 @@ export function CompletedOrdersContent() {
   );
 
   const stats = useMemo(() => computeOrderStats(filteredOrders), [filteredOrders]);
+  const {
+    paginatedItems: paginatedOrders,
+    page,
+    setPage,
+    totalPages,
+    pageSize,
+    totalItems,
+  } = usePagination(filteredOrders, CUSTOMER_PAGE_SIZE, `${period}-${referenceYmd.year}-${referenceYmd.month}-${referenceYmd.day}`);
   const periodRangeLabel = useMemo(
     () => getCompletedOrderPeriodRangeLabel(period, referenceDate),
     [period, referenceDate]
@@ -202,12 +214,31 @@ export function CompletedOrdersContent() {
             Purchase history for orders completed from the pending queue.
           </p>
         </div>
-        <Link
-          href="/pending-orders"
-          className={cn(buttonVariants({ variant: "outline" }))}
-        >
-          View Pending Orders
-        </Link>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <Button
+            type="button"
+            variant="outline"
+            disabled={filteredOrders.length === 0}
+            onClick={() =>
+              exportCompletedOrdersToExcel({
+                orders: filteredOrders,
+                products,
+                periodLabel,
+                periodRangeLabel,
+                stats,
+              })
+            }
+          >
+            <Download className="size-4" />
+            Export Excel
+          </Button>
+          <Link
+            href="/pending-orders"
+            className={cn(buttonVariants({ variant: "outline" }))}
+          >
+            View Pending Orders
+          </Link>
+        </div>
       </div>
 
       {error && <p className="text-sm text-destructive">{error}</p>}
@@ -390,8 +421,9 @@ export function CompletedOrdersContent() {
               </CardContent>
             </Card>
           ) : (
+          <>
           <div className="grid gap-4">
-          {filteredOrders.map((order) => {
+          {paginatedOrders.map((order) => {
             const checkout = computeOrderCheckout(order, products);
 
             return (
@@ -517,6 +549,14 @@ export function CompletedOrdersContent() {
             );
           })}
           </div>
+          <ListPagination
+            page={page}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            pageSize={pageSize}
+            onPageChange={setPage}
+          />
+          </>
           )}
         </>
       )}
