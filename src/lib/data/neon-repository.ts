@@ -23,6 +23,7 @@ import type {
   UpdateCustomerProfileInput,
 } from "@/types";
 import { generateId, normalizeContact } from "./loyalty-calculations";
+import { sendVoucherEarnedEmailSafely } from "@/lib/email/voucher-earned-email";
 import {
   mapCustomer,
   mapTransaction,
@@ -499,6 +500,21 @@ export async function logPurchase(
   }
 
   await sql.transaction(queries);
+
+  if (vouchersEarned > 0 || freeDrinkVouchersEarned > 0) {
+    await sendVoucherEarnedEmailSafely({
+      name: customer.name,
+      email: customer.email,
+      halfOffVouchersEarned: vouchersEarned,
+      freeDrinkVouchersEarned: freeDrinkVouchersEarned,
+      vouchersAvailable:
+        Number(customer.vouchers_available) + vouchersEarned,
+      freeDrinkVouchersAvailable:
+        Number(customer.free_drink_vouchers_available) +
+        freeDrinkVouchersEarned,
+      pointsBalance: newBalance,
+    });
+  }
 
   return {
     id: transactionId,

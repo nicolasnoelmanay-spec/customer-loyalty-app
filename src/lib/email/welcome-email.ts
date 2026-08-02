@@ -10,28 +10,29 @@ export interface WelcomeEmailInput {
 
 function buildWelcomeEmailContent(input: WelcomeEmailInput) {
   const loginUrl = `${getAppUrl()}/customer/login`;
-  const subject = `Welcome to ${loyaltyConfig.programName}`;
+  const brandName = loyaltyConfig.email.brandName;
+  const subject = `Welcome to ${brandName}`;
 
   const text = [
     `Hi ${input.name},`,
     "",
-    `Thanks for joining ${loyaltyConfig.programName}.`,
+    `Thanks for joining ${brandName}.`,
     "",
     `Your member username is ${input.username}.`,
     `Sign in anytime at ${loginUrl} to view your points and vouchers.`,
     "",
-    "See you at Coffeesentials!",
+    `See you at ${brandName}!`,
   ].join("\n");
 
   const html = `
     <p>Hi ${escapeHtml(input.name)},</p>
-    <p>Thanks for joining <strong>${escapeHtml(loyaltyConfig.programName)}</strong>.</p>
+    <p>Thanks for joining <strong>${escapeHtml(brandName)}</strong>.</p>
     <p>Your member username is <strong>${escapeHtml(input.username)}</strong>.</p>
     <p>
       <a href="${loginUrl}">Sign in to your account</a>
       to view your points and vouchers.
     </p>
-    <p>See you at Coffeesentials!</p>
+    <p>See you at ${escapeHtml(brandName)}!</p>
   `.trim();
 
   return { subject, text, html };

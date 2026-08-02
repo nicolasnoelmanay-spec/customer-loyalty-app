@@ -48,11 +48,18 @@ function parseEmailAddress(value: string): EmailAddress {
 }
 
 function getFromAddress(): EmailAddress {
+  const { brandName, fromAddress } = loyaltyConfig.email;
   const from = process.env.SENDWITH_FROM?.trim();
-  if (from) return parseEmailAddress(from);
 
-  const { fromName, fromAddress } = loyaltyConfig.email;
-  return { email: fromAddress, name: fromName };
+  if (from) {
+    const parsed = parseEmailAddress(from);
+    return {
+      email: parsed.email,
+      name: parsed.name || brandName,
+    };
+  }
+
+  return { email: fromAddress, name: brandName };
 }
 
 function normalizeRecipients(to: string | string[]): EmailAddress[] {
@@ -133,7 +140,7 @@ function extractMessageId(payload: unknown): string {
 
 function mapSendWithError(message: string): string {
   if (/invalid api key/i.test(message)) {
-    return "SendWith rejected the API key. Sign in at sendwith.email, connect nicolasnoelmanay@gmail.com, copy the API key from the dashboard, update SENDWITH_API_KEY in .env.local, and restart the dev server.";
+    return "SendWith rejected the API key. Sign in at sendwith.email, connect your Gmail account, copy the API key from the dashboard, update SENDWITH_API_KEY in .env.local, and restart the dev server.";
   }
 
   return message;
