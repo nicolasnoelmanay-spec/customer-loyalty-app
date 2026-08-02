@@ -5,7 +5,7 @@ import {
   requireStaffSession,
 } from "@/lib/api/route-utils";
 import { addCustomer } from "@/lib/data/neon-repository";
-import { sendWelcomeEmailSafely } from "@/lib/email/welcome-email";
+import { scheduleWelcomeEmail } from "@/lib/email/welcome-email";
 
 export async function POST(request: NextRequest) {
   try {
@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
       password,
     });
 
-    void sendWelcomeEmailSafely({
+    scheduleWelcomeEmail({
       name: customer.name,
       email: customer.email,
       username: customer.username,

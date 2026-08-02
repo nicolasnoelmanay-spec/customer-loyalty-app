@@ -1,3 +1,4 @@
+import { after } from "next/server";
 import { loyaltyConfig } from "@/config/loyalty";
 import { getAppUrl } from "@/lib/email/app-url";
 import { sendEmail } from "@/lib/email/send-email";
@@ -8,36 +9,6 @@ export interface WelcomeEmailInput {
   username: string;
 }
 
-function buildWelcomeEmailContent(input: WelcomeEmailInput) {
-  const loginUrl = `${getAppUrl()}/customer/login`;
-  const brandName = loyaltyConfig.email.brandName;
-  const subject = `Welcome to ${brandName}`;
-
-  const text = [
-    `Hi ${input.name},`,
-    "",
-    `Thanks for joining ${brandName}.`,
-    "",
-    `Your member username is ${input.username}.`,
-    `Sign in anytime at ${loginUrl} to view your points and vouchers.`,
-    "",
-    `See you at ${brandName}!`,
-  ].join("\n");
-
-  const html = `
-    <p>Hi ${escapeHtml(input.name)},</p>
-    <p>Thanks for joining <strong>${escapeHtml(brandName)}</strong>.</p>
-    <p>Your member username is <strong>${escapeHtml(input.username)}</strong>.</p>
-    <p>
-      <a href="${loginUrl}">Sign in to your account</a>
-      to view your points and vouchers.
-    </p>
-    <p>See you at ${escapeHtml(brandName)}!</p>
-  `.trim();
-
-  return { subject, text, html };
-}
-
 function escapeHtml(value: string): string {
   return value
     .replace(/&/g, "&amp;")
@@ -46,10 +17,55 @@ function escapeHtml(value: string): string {
     .replace(/"/g, "&quot;");
 }
 
+function buildWelcomeEmailContent(input: WelcomeEmailInput) {
+  const loginUrl = `${getAppUrl()}/customer/login`;
+  const brandName = loyaltyConfig.email.brandName;
+  const programName = loyaltyConfig.programName;
+  const subject = `Welcome to ${brandName}`;
+
+  const text = [
+    `Hi ${input.name},`,
+    "",
+    `Welcome to ${programName}! Your member account is ready.`,
+    "",
+    `Your username: ${input.username}`,
+    "",
+    "Here's how it works:",
+    `- Earn ${loyaltyConfig.pointsPerDrink} point for every qualifying ${loyaltyConfig.drinkLabel} (₱${loyaltyConfig.minDrinkPriceForPoints}+).`,
+    `- Collect ${loyaltyConfig.voucher.pointsPerVoucher} consecutive points for a ${loyaltyConfig.voucher.label}.`,
+    `- Reach ${loyaltyConfig.streak.cycleLength} consecutive points for a ${loyaltyConfig.freeDrinkVoucher.label}.`,
+    "",
+    "Show your member QR code at the counter when you order, or sign in anytime:",
+    loginUrl,
+    "",
+    `See you at ${brandName}!`,
+  ].join("\n");
+
+  const html = `
+    <p>Hi ${escapeHtml(input.name)},</p>
+    <p>Welcome to <strong>${escapeHtml(programName)}</strong>! Your member account is ready.</p>
+    <p>Your username: <strong>${escapeHtml(input.username)}</strong></p>
+    <p>Here's how it works:</p>
+    <ul>
+      <li>Earn ${loyaltyConfig.pointsPerDrink} point for every qualifying ${escapeHtml(loyaltyConfig.drinkLabel)} (₱${loyaltyConfig.minDrinkPriceForPoints}+).</li>
+      <li>Collect ${loyaltyConfig.voucher.pointsPerVoucher} consecutive points for a ${escapeHtml(loyaltyConfig.voucher.label)}.</li>
+      <li>Reach ${loyaltyConfig.streak.cycleLength} consecutive points for a ${escapeHtml(loyaltyConfig.freeDrinkVoucher.label)}.</li>
+    </ul>
+    <p>
+      Show your member QR code at the counter when you order, or
+      <a href="${loginUrl}">sign in to your account</a> anytime.
+    </p>
+    <p>See you at ${escapeHtml(brandName)}!</p>
+  `.trim();
+
+  return { subject, text, html };
+}
+
 export async function sendWelcomeEmail(
   input: WelcomeEmailInput
 ): Promise<{ id: string } | null> {
   if (!process.env.SENDWITH_API_KEY?.trim()) {
+    console.warn("Skipping welcome email: SENDWITH_API_KEY is not configured.");
     return null;
   }
 
@@ -71,4 +87,9 @@ export async function sendWelcomeEmailSafely(
   } catch (error) {
     console.error("Failed to send welcome email.", error);
   }
+}
+
+/** Schedule a welcome email after the HTTP response finishes. */
+export function scheduleWelcomeEmail(input: WelcomeEmailInput): void {
+  after(() => sendWelcomeEmailSafely(input));
 }

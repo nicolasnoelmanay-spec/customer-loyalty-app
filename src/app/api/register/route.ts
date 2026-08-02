@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { handleRouteError, jsonError } from "@/lib/api/route-utils";
 import { registerMember } from "@/lib/data/neon-repository";
-import { sendWelcomeEmailSafely } from "@/lib/email/welcome-email";
+import { scheduleWelcomeEmail } from "@/lib/email/welcome-email";
 
 export async function POST(request: Request) {
   try {
@@ -27,7 +27,7 @@ export async function POST(request: Request) {
       password,
     });
 
-    void sendWelcomeEmailSafely({
+    scheduleWelcomeEmail({
       name: customer.name,
       email: customer.email,
       username: customer.username,

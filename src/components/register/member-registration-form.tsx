@@ -90,9 +90,10 @@ export function MemberRegistrationForm({
           </div>
           <h2 className="text-lg font-semibold">Welcome, {registeredCustomer.name}!</h2>
           <p className="text-sm text-muted-foreground">
-            You&apos;re now a member of {loyaltyConfig.programName}. Sign in with
-            your username and password to view your account, or show your QR code
-            at the counter to earn points.
+            You&apos;re now a member of {loyaltyConfig.programName}. A welcome
+            email was sent to {registeredCustomer.email}. Sign in with your
+            username and password to view your account, or show your QR code at
+            the counter to earn points.
           </p>
         </div>
         <CustomerQrImage
