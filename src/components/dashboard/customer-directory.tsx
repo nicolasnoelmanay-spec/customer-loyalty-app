@@ -14,6 +14,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { ListPagination } from "@/components/ui/list-pagination";
 import {
   Table,
   TableBody,
@@ -23,6 +24,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useLoyalty } from "@/hooks/use-loyalty";
+import { CUSTOMER_PAGE_SIZE, usePagination } from "@/hooks/use-pagination";
 import type { Customer } from "@/types";
 
 export function CustomerDirectory() {
@@ -30,6 +32,14 @@ export function CustomerDirectory() {
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [qrCustomer, setQrCustomer] = useState<Customer | null>(null);
   const [emailCustomer, setEmailCustomer] = useState<Customer | null>(null);
+  const {
+    paginatedItems,
+    page,
+    setPage,
+    totalPages,
+    pageSize,
+    totalItems,
+  } = usePagination(customers, CUSTOMER_PAGE_SIZE, customers.length);
 
   return (
     <>
@@ -40,7 +50,8 @@ export function CustomerDirectory() {
             Customer Directory
           </CardTitle>
           <CardDescription>
-            {customers.length} registered customer{customers.length !== 1 ? "s" : ""}
+            {customers.length} registered customer
+            {customers.length !== 1 ? "s" : ""}
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
@@ -52,10 +63,18 @@ export function CustomerDirectory() {
                   <TableHead className="hidden sm:table-cell">Phone</TableHead>
                   <TableHead className="hidden md:table-cell">Email</TableHead>
                   <TableHead className="text-right">Balance</TableHead>
-                  <TableHead className="hidden xl:table-cell text-right">Total Earned</TableHead>
-                  <TableHead className="hidden lg:table-cell text-right">Streak</TableHead>
-                  <TableHead className="hidden lg:table-cell text-right">50% Stack</TableHead>
-                  <TableHead className="hidden lg:table-cell text-right">Free Drink Stack</TableHead>
+                  <TableHead className="hidden xl:table-cell text-right">
+                    Total Earned
+                  </TableHead>
+                  <TableHead className="hidden lg:table-cell text-right">
+                    Streak
+                  </TableHead>
+                  <TableHead className="hidden lg:table-cell text-right">
+                    50% Stack
+                  </TableHead>
+                  <TableHead className="hidden lg:table-cell text-right">
+                    Free Drink Stack
+                  </TableHead>
                   <TableHead className="w-32">
                     <span className="sr-only">Actions</span>
                   </TableHead>
@@ -64,14 +83,19 @@ export function CustomerDirectory() {
               <TableBody>
                 {customers.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="py-8 text-center text-muted-foreground">
+                    <TableCell
+                      colSpan={9}
+                      className="py-8 text-center text-muted-foreground"
+                    >
                       No customers yet. Add your first customer to get started.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  customers.map((customer) => (
+                  paginatedItems.map((customer) => (
                     <TableRow key={customer.id}>
-                      <TableCell className="font-medium">{customer.name}</TableCell>
+                      <TableCell className="font-medium">
+                        {customer.name}
+                      </TableCell>
                       <TableCell className="hidden sm:table-cell text-muted-foreground">
                         {customer.phone}
                       </TableCell>
@@ -144,6 +168,13 @@ export function CustomerDirectory() {
               </TableBody>
             </Table>
           </div>
+          <ListPagination
+            page={page}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            pageSize={pageSize}
+            onPageChange={setPage}
+          />
         </CardContent>
       </Card>
 
