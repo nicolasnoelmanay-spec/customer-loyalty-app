@@ -8,6 +8,7 @@ import {
   getRegistrationQrCardDimensions,
   getRegistrationQrDownloadFileName,
 } from "@/lib/qr/registration-qr-card";
+import { getMemberRegistrationQrTitle } from "@/lib/qr/registration-qr";
 import {
   downloadQrImage,
   getQrDownloadButtonLabel,
@@ -24,7 +25,7 @@ interface RegistrationQrImageProps {
 export function RegistrationQrImage({
   size = 220,
   showDownload = false,
-  title = "Join Now",
+  title = getMemberRegistrationQrTitle(),
 }: RegistrationQrImageProps) {
   const [dataUrl, setDataUrl] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -69,7 +70,7 @@ export function RegistrationQrImage({
   }
 
   if (!dataUrl) {
-    const cardSize = getRegistrationQrCardDimensions(size);
+    const cardSize = getRegistrationQrCardDimensions(size, title);
     return (
       <div className="flex flex-col items-center gap-3">
         <div
@@ -82,7 +83,7 @@ export function RegistrationQrImage({
     );
   }
 
-  const cardSize = getRegistrationQrCardDimensions(size);
+  const cardSize = getRegistrationQrCardDimensions(size, title);
 
   return (
     <div className="flex w-full max-w-full flex-col items-center gap-3">

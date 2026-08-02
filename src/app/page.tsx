@@ -90,7 +90,7 @@ export default function HomePage() {
           <div className="mx-auto mt-20 max-w-sm">
             <Card className="p-6">
               <div className="flex justify-center">
-                <RegistrationQrImage size={220} title="Join Now" />
+                <RegistrationQrImage size={220} />
               </div>
             </Card>
           </div>
