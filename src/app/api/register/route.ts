@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { handleRouteError, jsonError } from "@/lib/api/route-utils";
 import { registerMember } from "@/lib/data/neon-repository";
+import { sendWelcomeEmailSafely } from "@/lib/email/welcome-email";
 
 export async function POST(request: Request) {
   try {
@@ -25,6 +26,13 @@ export async function POST(request: Request) {
       username,
       password,
     });
+
+    void sendWelcomeEmailSafely({
+      name: customer.name,
+      email: customer.email,
+      username: customer.username,
+    });
+
     return NextResponse.json(customer, { status: 201 });
   } catch (error) {
     return handleRouteError(error, "Failed to register member.");

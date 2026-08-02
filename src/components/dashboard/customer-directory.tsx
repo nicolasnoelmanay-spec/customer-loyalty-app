@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Pencil, QrCode, Users } from "lucide-react";
+import { Mail, Pencil, QrCode, Users } from "lucide-react";
 import { EditCustomerDialog } from "@/components/dashboard/edit-customer-dialog";
+import { SendCustomerEmailDialog } from "@/components/dashboard/send-customer-email-dialog";
 import { CustomerQrDialog } from "@/components/qr/customer-qr-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -28,6 +29,7 @@ export function CustomerDirectory() {
   const { customers } = useLoyalty();
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [qrCustomer, setQrCustomer] = useState<Customer | null>(null);
+  const [emailCustomer, setEmailCustomer] = useState<Customer | null>(null);
 
   return (
     <>
@@ -54,7 +56,7 @@ export function CustomerDirectory() {
                   <TableHead className="hidden lg:table-cell text-right">Streak</TableHead>
                   <TableHead className="hidden lg:table-cell text-right">50% Stack</TableHead>
                   <TableHead className="hidden lg:table-cell text-right">Free Drink Stack</TableHead>
-                  <TableHead className="w-24">
+                  <TableHead className="w-32">
                     <span className="sr-only">Actions</span>
                   </TableHead>
                 </TableRow>
@@ -121,6 +123,14 @@ export function CustomerDirectory() {
                           <Button
                             variant="ghost"
                             size="icon-sm"
+                            aria-label={`Send email to ${customer.name}`}
+                            onClick={() => setEmailCustomer(customer)}
+                          >
+                            <Mail className="size-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
                             aria-label={`Edit ${customer.name}`}
                             onClick={() => setEditingCustomer(customer)}
                           >
@@ -150,6 +160,14 @@ export function CustomerDirectory() {
         open={qrCustomer !== null}
         onOpenChange={(open) => {
           if (!open) setQrCustomer(null);
+        }}
+      />
+
+      <SendCustomerEmailDialog
+        customer={emailCustomer}
+        open={emailCustomer !== null}
+        onOpenChange={(open) => {
+          if (!open) setEmailCustomer(null);
         }}
       />
     </>

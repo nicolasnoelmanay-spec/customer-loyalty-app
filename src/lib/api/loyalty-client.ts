@@ -81,6 +81,22 @@ export async function apiUpdateCustomer(
   return parseJson(response);
 }
 
+export async function apiSendEmail(input: {
+  to: string | string[];
+  subject: string;
+  html?: string;
+  text?: string;
+  replyTo?: string;
+}): Promise<{ id: string }> {
+  const response = await fetch("/api/email", {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  return parseJson(response);
+}
+
 export async function apiDeleteCustomer(input: {
   customerId: string;
   adminUsername: string;
