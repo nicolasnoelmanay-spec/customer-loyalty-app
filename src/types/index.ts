@@ -70,15 +70,19 @@ export interface LogPurchaseInput {
   notes?: string;
 }
 
-export type ProductCategory = "drink" | "snack";
+export type ProductCategory = "drink" | "frappe" | "snack";
 
 export type DrinkTemperature = "hot" | "iced";
+
+export type QuarterPounderOption = "cheese" | "tlc";
 
 export interface Product {
   id: string;
   name: string;
   category: ProductCategory;
   price: number;
+  /** Iced drink price; null for hot-only drinks, frappés, and snacks */
+  icedPrice: number | null;
   pointsEarned: number;
   description: string;
   active: boolean;
@@ -89,6 +93,7 @@ export interface PurchaseItemInput {
   productId: string;
   quantity: number;
   temperature?: DrinkTemperature;
+  quarterPounderOption?: QuarterPounderOption;
 }
 
 export type VoucherApplyOption = "none" | "voucher" | "free-drink-voucher";

@@ -1,17 +1,39 @@
 import type { DrinkTemperature, Product, PurchaseItemInput } from "@/types";
+import { isHotColdDrinkProduct } from "@/lib/data/product-categories";
+import {
+  isValidQuarterPounderOption,
+} from "@/lib/data/quarter-pounder-options";
+import type { QuarterPounderOption } from "@/types";
 
-export const COLD_BREW_PRODUCT_ID = "prod-cold-brew";
+export const ESPRESSO_PRODUCT_ID = "prod-espresso";
+export const PISTACHIO_LATTE_PRODUCT_ID = "prod-pistachio-latte";
+
+const HOT_ONLY_DRINK_IDS = new Set<string>([ESPRESSO_PRODUCT_ID]);
+const ICED_ONLY_DRINK_IDS = new Set<string>([PISTACHIO_LATTE_PRODUCT_ID]);
+
+export function productIsHotOnlyDrink(product: Product): boolean {
+  return HOT_ONLY_DRINK_IDS.has(product.id);
+}
+
+export function productIsIcedOnlyDrink(product: Product): boolean {
+  return ICED_ONLY_DRINK_IDS.has(product.id);
+}
 
 export function productOffersHotCold(product: Product): boolean {
-  return product.category === "drink" && product.id !== COLD_BREW_PRODUCT_ID;
+  return (
+    isHotColdDrinkProduct(product) &&
+    !productIsHotOnlyDrink(product) &&
+    !productIsIcedOnlyDrink(product)
+  );
 }
 
 export function resolveItemTemperature(
   product: Product,
   temperature?: DrinkTemperature
 ): DrinkTemperature | undefined {
-  if (product.category !== "drink") return undefined;
-  if (product.id === COLD_BREW_PRODUCT_ID) return "iced";
+  if (!isHotColdDrinkProduct(product)) return undefined;
+  if (productIsHotOnlyDrink(product)) return "hot";
+  if (productIsIcedOnlyDrink(product)) return "iced";
   return temperature;
 }
 
@@ -27,25 +49,29 @@ export function formatTemperatureLabel(temperature: DrinkTemperature): string {
 
 export function encodeCartKey(
   productId: string,
-  temperature?: DrinkTemperature
+  variant?: DrinkTemperature | QuarterPounderOption
 ): string {
-  return temperature ? `${productId}:${temperature}` : productId;
+  return variant ? `${productId}:${variant}` : productId;
 }
 
 export function decodeCartKey(key: string): {
   productId: string;
   temperature?: DrinkTemperature;
+  quarterPounderOption?: QuarterPounderOption;
 } {
   const separator = key.indexOf(":");
   if (separator === -1) return { productId: key };
 
   const productId = key.slice(0, separator);
-  const temperature = key.slice(separator + 1);
-  if (temperature === "cold") {
+  const variant = key.slice(separator + 1);
+  if (variant === "cold") {
     return { productId, temperature: "iced" };
   }
-  if (isValidDrinkTemperature(temperature)) {
-    return { productId, temperature };
+  if (isValidDrinkTemperature(variant)) {
+    return { productId, temperature: variant };
+  }
+  if (isValidQuarterPounderOption(variant)) {
+    return { productId, quarterPounderOption: variant };
   }
   return { productId: key };
 }
@@ -53,12 +79,16 @@ export function decodeCartKey(key: string): {
 export function formatPurchaseLine(
   productName: string,
   quantity: number,
-  temperature?: DrinkTemperature
+  temperature?: DrinkTemperature,
+  quarterPounderOption?: QuarterPounderOption
 ): string {
   const tempLabel = temperature
     ? ` (${formatTemperatureLabel(temperature)})`
     : "";
-  return `${quantity} × ${productName}${tempLabel}`;
+  const addOnLabel = quarterPounderOption
+    ? ` (${quarterPounderOption === "cheese" ? "With Cheese" : "With TLC"})`
+    : "";
+  return `${quantity} × ${productName}${tempLabel}${addOnLabel}`;
 }
 
 export function normalizePurchaseItem(
@@ -73,11 +103,18 @@ export function validatePurchaseItemTemperature(
   item: PurchaseItemInput,
   product: Product
 ): void {
-  if (product.category !== "drink") return;
+  if (!isHotColdDrinkProduct(product)) return;
 
-  if (product.id === COLD_BREW_PRODUCT_ID) {
+  if (productIsHotOnlyDrink(product)) {
+    if (item.temperature && item.temperature !== "hot") {
+      throw new Error(`${product.name} is only available hot.`);
+    }
+    return;
+  }
+
+  if (productIsIcedOnlyDrink(product)) {
     if (item.temperature && item.temperature !== "iced") {
-      throw new Error("Cold Brew is only available iced.");
+      throw new Error(`${product.name} is only available iced.`);
     }
     return;
   }

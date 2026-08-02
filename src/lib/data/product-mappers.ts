@@ -5,6 +5,7 @@ export interface ProductRow {
   name: string;
   category: string;
   price: number;
+  iced_price: number | null;
   points_earned: number;
   description: string;
   active: boolean;
@@ -18,6 +19,7 @@ export function mapProduct(row: ProductRow): Product {
     name: row.name,
     category: row.category as ProductCategory,
     price: Number(row.price),
+    icedPrice: row.iced_price == null ? null : Number(row.iced_price),
     pointsEarned: Number(row.points_earned),
     description: row.description,
     active: Boolean(row.active),

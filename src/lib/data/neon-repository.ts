@@ -39,6 +39,10 @@ import {
   validatePurchaseItemTemperature,
 } from "./drink-temperature";
 import {
+  normalizePurchaseItemQuarterPounderOption,
+  validatePurchaseItemQuarterPounderOption,
+} from "./quarter-pounder-options";
+import {
   enrichPendingOrder,
   enrichCompletedOrder,
   type CompletedOrderRecord,
@@ -361,7 +365,12 @@ export async function logPurchase(
       const product = productMap.get(item.productId);
       if (!product) throw new Error("One or more products were not found.");
       validatePurchaseItemTemperature(item, product);
-      return normalizePurchaseItem(item, product);
+      validatePurchaseItemQuarterPounderOption(item, product);
+      const normalizedTemperature = normalizePurchaseItem(item, product);
+      return normalizePurchaseItemQuarterPounderOption(
+        normalizedTemperature,
+        product
+      );
     });
 
     const totals = calculatePurchaseTotals(normalizedItems, products);
@@ -728,7 +737,12 @@ async function normalizePendingOrderItems(
       throw new Error("One or more products were not found.");
     }
     validatePurchaseItemTemperature(item, product);
-    return normalizePurchaseItem(item, product);
+    validatePurchaseItemQuarterPounderOption(item, product);
+    const normalizedTemperature = normalizePurchaseItem(item, product);
+    return normalizePurchaseItemQuarterPounderOption(
+      normalizedTemperature,
+      product
+    );
   });
 }
 

@@ -13,7 +13,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { formatTemperatureLabel } from "@/lib/data/drink-temperature";
+import { formatQuarterPounderOptionLabel } from "@/lib/data/quarter-pounder-options";
 import { formatCurrency } from "@/lib/data/purchase-calculations";
 import {
   apiCompletePendingOrder,
@@ -172,13 +172,13 @@ export function PendingOrdersContent() {
                 <div className="space-y-2">
                   {order.items.map((item, index) => (
                     <div
-                      key={`${order.id}-${item.productId}-${item.temperature ?? "snack"}-${index}`}
+                      key={`${order.id}-${item.productId}-${item.temperature ?? item.quarterPounderOption ?? "snack"}-${index}`}
                       className="flex items-center justify-between rounded-lg border bg-muted/30 px-3 py-2 text-sm"
                     >
                       <span>
                         {item.quantity} × {productName(item.productId)}
-                        {item.temperature
-                          ? ` · ${formatTemperatureLabel(item.temperature)}`
+                        {item.quarterPounderOption
+                          ? ` · ${formatQuarterPounderOptionLabel(item.quarterPounderOption)}`
                           : ""}
                       </span>
                     </div>

@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { formatTemperatureLabel } from "@/lib/data/drink-temperature";
+import { formatQuarterPounderOptionLabel } from "@/lib/data/quarter-pounder-options";
 import {
   calculateCheckoutTotal,
   calculateProductPointsEarned,
@@ -53,7 +53,14 @@ function cartProductsFromItems(items: PurchaseItemInput[], products: Product[]) 
   return items.flatMap((item) => {
     const product = products.find((entry) => entry.id === item.productId);
     if (!product) return [];
-    return [{ product, quantity: item.quantity, temperature: item.temperature }];
+    return [
+      {
+        product,
+        quantity: item.quantity,
+        temperature: item.temperature,
+        quarterPounderOption: item.quarterPounderOption,
+      },
+    ];
   });
 }
 
@@ -423,7 +430,11 @@ export function CompletedOrdersContent() {
                       );
                     }
 
-                    const unitPrice = getUnitPrice(product, item.temperature);
+                    const unitPrice = getUnitPrice(
+                      product,
+                      item.temperature,
+                      item.quarterPounderOption
+                    );
                     const lineTotal = unitPrice * item.quantity;
                     const linePoints = calculateProductPointsEarned(
                       product,
@@ -433,14 +444,14 @@ export function CompletedOrdersContent() {
 
                     return (
                       <div
-                        key={`${order.id}-${item.productId}-${item.temperature ?? "snack"}-${index}`}
+                        key={`${order.id}-${item.productId}-${item.temperature ?? item.quarterPounderOption ?? "snack"}-${index}`}
                         className="flex items-start justify-between gap-3 rounded-lg border bg-muted/30 px-3 py-2 text-sm"
                       >
                         <div>
                           <p className="font-medium">
                             {product.name}
-                            {item.temperature
-                              ? ` · ${formatTemperatureLabel(item.temperature)}`
+                            {item.quarterPounderOption
+                              ? ` · ${formatQuarterPounderOptionLabel(item.quarterPounderOption)}`
                               : ""}
                           </p>
                           <p className="text-muted-foreground">

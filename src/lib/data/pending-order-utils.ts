@@ -29,6 +29,7 @@ function cartProductsFromItems(items: PurchaseItemInput[], products: Product[]) 
         product,
         quantity: item.quantity,
         temperature: item.temperature,
+        quarterPounderOption: item.quarterPounderOption,
       },
     ];
   });

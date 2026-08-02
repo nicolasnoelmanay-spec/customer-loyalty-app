@@ -5,6 +5,7 @@ import {
   requireStaffSession,
 } from "@/lib/api/route-utils";
 import { isValidDrinkTemperature } from "@/lib/data/drink-temperature";
+import { isValidQuarterPounderOption } from "@/lib/data/quarter-pounder-options";
 import { createPendingOrder, getPendingOrders } from "@/lib/data/neon-repository";
 import type { VoucherApplyOption } from "@/types";
 
@@ -61,6 +62,12 @@ export async function POST(request: Request) {
         !isValidDrinkTemperature(item.temperature)
       ) {
         return jsonError("Temperature must be hot or iced.", 400);
+      }
+      if (
+        item.quarterPounderOption !== undefined &&
+        !isValidQuarterPounderOption(item.quarterPounderOption)
+      ) {
+        return jsonError("Invalid Quarter Pounder add-on.", 400);
       }
     }
 

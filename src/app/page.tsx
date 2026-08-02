@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Gift, Search, UserPlus, Users } from "lucide-react";
+import { ArrowRight, Gift, LogIn, Search, UserPlus, Users } from "lucide-react";
 import { AppHeader } from "@/components/app-header";
 import { buttonVariants } from "@/components/ui/button";
 import {
@@ -43,7 +43,8 @@ export default function HomePage() {
                 href="/login?customer=1"
                 className={cn(buttonVariants({ size: "lg", variant: "outline" }))}
               >
-                My Account
+                <LogIn className="size-4" />
+                Member Login
               </Link>
               <Link
                 href="/login?join=1"

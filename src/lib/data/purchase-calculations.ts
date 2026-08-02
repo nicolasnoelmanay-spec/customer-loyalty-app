@@ -1,9 +1,12 @@
-import { COLD_BREW_PRODUCT_ID, formatPurchaseLine } from "@/lib/data/drink-temperature";
+import { formatPurchaseLine } from "@/lib/data/drink-temperature";
+import { isDrinkCategory } from "@/lib/data/product-categories";
+import { getQuarterPounderOptionSurcharge } from "@/lib/data/quarter-pounder-options";
 import { loyaltyConfig } from "@/config/loyalty";
 import type {
   DrinkTemperature,
   Product,
   PurchaseItemInput,
+  QuarterPounderOption,
   VoucherApplyOption,
 } from "@/types";
 
@@ -27,16 +30,17 @@ export function formatCurrency(amount: number): string {
 
 export function getUnitPrice(
   product: Product,
-  temperature?: DrinkTemperature
+  temperature?: DrinkTemperature,
+  quarterPounderOption?: QuarterPounderOption
 ): number {
-  if (
-    product.category === "drink" &&
-    temperature === "iced" &&
-    product.id !== COLD_BREW_PRODUCT_ID
-  ) {
-    return product.price + loyaltyConfig.icedDrinkSurcharge;
+  let price = product.price;
+  if (isDrinkCategory(product.category) && temperature === "iced") {
+    price =
+      product.icedPrice ??
+      product.price + loyaltyConfig.icedDrinkSurcharge;
   }
-  return product.price;
+  price += getQuarterPounderOptionSurcharge(quarterPounderOption);
+  return price;
 }
 
 export function icedDrinkSurchargeLabel(): string {
@@ -48,7 +52,7 @@ export function productQualifiesForPoints(
   temperature?: DrinkTemperature
 ): boolean {
   return (
-    product.category === "drink" &&
+    isDrinkCategory(product.category) &&
     getUnitPrice(product, temperature) >= loyaltyConfig.minDrinkPriceForPoints
   );
 }
@@ -74,14 +78,25 @@ export function calculatePurchaseTotals(
     const product = products.find((entry) => entry.id === item.productId);
     if (!product) continue;
 
-    const unitPrice = getUnitPrice(product, item.temperature);
+    const unitPrice = getUnitPrice(
+      product,
+      item.temperature,
+      item.quarterPounderOption
+    );
     subtotal += unitPrice * item.quantity;
     pointsEarned += calculateProductPointsEarned(
       product,
       item.quantity,
       item.temperature
     );
-    lines.push(formatPurchaseLine(product.name, item.quantity, item.temperature));
+    lines.push(
+      formatPurchaseLine(
+        product.name,
+        item.quantity,
+        item.temperature,
+        item.quarterPounderOption
+      )
+    );
   }
 
   return {
@@ -100,10 +115,11 @@ function drinkUnitPrices(
     product: Product;
     quantity: number;
     temperature?: DrinkTemperature;
+    quarterPounderOption?: QuarterPounderOption;
   }[]
 ): number[] {
   return cartProducts
-    .filter(({ product }) => product.category === "drink")
+    .filter(({ product }) => isDrinkCategory(product.category))
     .flatMap(({ product, quantity, temperature }) =>
       Array.from({ length: quantity }, () =>
         getUnitPrice(product, temperature)
@@ -117,6 +133,7 @@ export function calculateCheckoutTotal(
     product: Product;
     quantity: number;
     temperature?: DrinkTemperature;
+    quarterPounderOption?: QuarterPounderOption;
   }[],
   voucherToApply: VoucherApplyOption
 ): CheckoutTotal {
