@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { formatTransactionDate } from "@/lib/format-date";
 import { formatStreakProgress, loyaltyConfig } from "@/config/loyalty";
+import { usePagination } from "@/hooks/use-pagination";
 import { CustomerQrImage } from "@/components/qr/customer-qr-image";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -26,6 +27,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { ListPagination } from "@/components/ui/list-pagination";
 import type { Customer, Transaction } from "@/types";
 
 interface CustomerAccountDetailsProps {
@@ -37,6 +39,15 @@ export function CustomerAccountDetails({
   customer,
   transactions = [],
 }: CustomerAccountDetailsProps) {
+  const {
+    paginatedItems,
+    page,
+    setPage,
+    totalPages,
+    pageSize,
+    totalItems,
+  } = usePagination(transactions, 10, customer.id);
+
   return (
     <>
       <Card className="border-emerald-200 dark:border-emerald-900">
@@ -110,7 +121,7 @@ export function CustomerAccountDetails({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {transactions.map((txn) => (
+                {paginatedItems.map((txn) => (
                   <TableRow key={txn.id}>
                     <TableCell className="text-muted-foreground whitespace-nowrap">
                       {formatTransactionDate(txn.createdAt)}
@@ -190,6 +201,13 @@ export function CustomerAccountDetails({
                 ))}
               </TableBody>
             </Table>
+            <ListPagination
+              page={page}
+              totalPages={totalPages}
+              totalItems={totalItems}
+              pageSize={pageSize}
+              onPageChange={setPage}
+            />
           </CardContent>
         </Card>
       )}

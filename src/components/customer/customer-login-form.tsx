@@ -12,11 +12,13 @@ import { useCustomerAuth } from "@/hooks/use-customer-auth";
 interface CustomerLoginFormProps {
   embedded?: boolean;
   onJoinClick?: () => void;
+  onForgotClick?: () => void;
 }
 
 export function CustomerLoginForm({
   embedded = false,
   onJoinClick,
+  onForgotClick,
 }: CustomerLoginFormProps) {
   const router = useRouter();
   const { login } = useCustomerAuth();
@@ -61,7 +63,25 @@ export function CustomerLoginForm({
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="customer-password">Password</Label>
+          <div className="flex items-center justify-between gap-2">
+            <Label htmlFor="customer-password">Password</Label>
+            {embedded && onForgotClick ? (
+              <button
+                type="button"
+                onClick={onForgotClick}
+                className="text-xs font-medium text-emerald-700 underline underline-offset-2 dark:text-emerald-400"
+              >
+                Forgot password?
+              </button>
+            ) : (
+              <Link
+                href="/login?customer=1&forgot=1"
+                className="text-xs font-medium text-emerald-700 underline underline-offset-2 dark:text-emerald-400"
+              >
+                Forgot password?
+              </Link>
+            )}
+          </div>
           <Input
             id="customer-password"
             name="customer-password"

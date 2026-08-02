@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { formatTransactionDate } from "@/lib/format-date";
 import { formatStreakProgress, loyaltyConfig } from "@/config/loyalty";
+import { usePagination } from "@/hooks/use-pagination";
 import { lookupCustomer } from "@/lib/api/loyalty-client";
 import { CustomerQrImage } from "@/components/qr/customer-qr-image";
 import { Badge } from "@/components/ui/badge";
@@ -33,6 +34,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { ListPagination } from "@/components/ui/list-pagination";
 import type { Customer, Transaction } from "@/types";
 
 export function CustomerLookupForm() {
@@ -41,6 +43,14 @@ export function CustomerLookupForm() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [notFound, setNotFound] = useState(false);
   const [loading, setLoading] = useState(false);
+  const {
+    paginatedItems,
+    page,
+    setPage,
+    totalPages,
+    pageSize,
+    totalItems,
+  } = usePagination(transactions, 10, customer?.id);
 
   async function handleSearch(e: React.FormEvent) {
     e.preventDefault();
@@ -51,7 +61,7 @@ export function CustomerLookupForm() {
     try {
       const result = await lookupCustomer(query);
       setCustomer(result.customer);
-      setTransactions(result.transactions.slice(0, 10));
+      setTransactions(result.transactions);
       setNotFound(!result.customer);
     } catch {
       setCustomer(null);
@@ -178,7 +188,7 @@ export function CustomerLookupForm() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {transactions.map((txn) => (
+                    {paginatedItems.map((txn) => (
                         <TableRow key={txn.id}>
                           <TableCell className="text-muted-foreground whitespace-nowrap">
                             {formatTransactionDate(txn.createdAt)}
@@ -233,6 +243,13 @@ export function CustomerLookupForm() {
                       ))}
                   </TableBody>
                 </Table>
+                <ListPagination
+                  page={page}
+                  totalPages={totalPages}
+                  totalItems={totalItems}
+                  pageSize={pageSize}
+                  onPageChange={setPage}
+                />
               </CardContent>
             </Card>
           )}

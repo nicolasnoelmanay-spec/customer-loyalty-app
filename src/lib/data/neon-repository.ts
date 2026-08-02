@@ -23,6 +23,12 @@ import type {
   UpdateCustomerProfileInput,
 } from "@/types";
 import { generateId, normalizeContact } from "./loyalty-calculations";
+import {
+  generatePasswordResetToken,
+  hashPasswordResetToken,
+  PASSWORD_RESET_TOKEN_HOURS,
+} from "@/lib/auth/password-reset-token";
+import { sendPasswordResetEmailSafely } from "@/lib/email/password-reset-email";
 import { sendVoucherEarnedEmailSafely } from "@/lib/email/voucher-earned-email";
 import {
   mapCustomer,
@@ -175,6 +181,104 @@ export async function findCustomerByContact(
   }
 
   return findCustomerByPhone(trimmed);
+}
+
+export async function requestPasswordReset(email: string): Promise<void> {
+  const customer = await findCustomerByEmail(email);
+  if (!customer) return;
+
+  const row = await getCustomerRow(customer.id);
+  if (!row?.password_hash) return;
+
+  const { raw, hash } = generatePasswordResetToken();
+  const expiresAt = new Date(
+    Date.now() + PASSWORD_RESET_TOKEN_HOURS * 60 * 60 * 1000
+  ).toISOString();
+  const tokenId = generateId("prst");
+  const sql = getSql();
+
+  await sql.transaction([
+    sql`
+      UPDATE password_reset_tokens
+      SET used_at = NOW()
+      WHERE customer_id = ${customer.id} AND used_at IS NULL
+    `,
+    sql`
+      INSERT INTO password_reset_tokens (id, customer_id, token_hash, expires_at)
+      VALUES (${tokenId}, ${customer.id}, ${hash}, ${expiresAt})
+    `,
+  ]);
+
+  await sendPasswordResetEmailSafely({
+    name: customer.name,
+    email: customer.email,
+    token: raw,
+  });
+}
+
+export async function resetCustomerPassword(input: {
+  token: string;
+  password: string;
+}): Promise<Customer> {
+  const password = input.password;
+  if (!password || password.length < 4) {
+    throw new Error("Password must be at least 4 characters.");
+  }
+
+  const tokenHash = hashPasswordResetToken(input.token.trim());
+  const sql = getSql();
+  const rows = await sql`
+    SELECT id, customer_id, expires_at, used_at
+    FROM password_reset_tokens
+    WHERE token_hash = ${tokenHash}
+    LIMIT 1
+  `;
+
+  if (rows.length === 0) {
+    throw new Error("This reset link is invalid or has expired.");
+  }
+
+  const tokenRow = rows[0] as {
+    id: string;
+    customer_id: string;
+    expires_at: string;
+    used_at: string | null;
+  };
+
+  if (tokenRow.used_at) {
+    throw new Error("This reset link has already been used.");
+  }
+
+  if (new Date(tokenRow.expires_at).getTime() < Date.now()) {
+    throw new Error("This reset link has expired.");
+  }
+
+  const bcrypt = await import("bcryptjs");
+  const passwordHash = await bcrypt.hash(password, 10);
+
+  await sql.transaction([
+    sql`
+      UPDATE customers
+      SET password_hash = ${passwordHash}
+      WHERE id = ${tokenRow.customer_id}
+    `,
+    sql`
+      UPDATE password_reset_tokens
+      SET used_at = NOW()
+      WHERE id = ${tokenRow.id}
+    `,
+    sql`
+      DELETE FROM customer_sessions
+      WHERE customer_id = ${tokenRow.customer_id}
+    `,
+  ]);
+
+  const customer = await getCustomerById(tokenRow.customer_id);
+  if (!customer) {
+    throw new Error("Customer not found.");
+  }
+
+  return customer;
 }
 
 export async function addCustomer(

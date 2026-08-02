@@ -64,3 +64,26 @@ export async function apiUpdateCustomerProfile(input: {
   });
   return parseJson(response);
 }
+
+export async function apiRequestPasswordReset(email: string): Promise<void> {
+  const response = await fetch("/api/customer-auth/forgot-password", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+  await parseJson(response);
+}
+
+export async function apiResetCustomerPassword(input: {
+  token: string;
+  password: string;
+}): Promise<Customer> {
+  const response = await fetch("/api/customer-auth/reset-password", {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  const data = await parseJson<{ customer: Customer }>(response);
+  return data.customer;
+}

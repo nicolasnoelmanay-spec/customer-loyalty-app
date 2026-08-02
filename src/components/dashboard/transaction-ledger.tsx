@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ArrowDownLeft, ArrowUpRight, Coffee, History, Ticket, Trash2 } from "lucide-react";
 import { formatTransactionDate } from "@/lib/format-date";
+import { usePagination } from "@/hooks/use-pagination";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -28,6 +29,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { ListPagination } from "@/components/ui/list-pagination";
 import { useLoyalty } from "@/hooks/use-loyalty";
 import type { Transaction } from "@/types";
 
@@ -127,6 +129,14 @@ function TransactionBadge({ txn }: { txn: Transaction }) {
 export function TransactionLedger() {
   const { transactions, getCustomerById, clearTransactionHistory } = useLoyalty();
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const {
+    paginatedItems,
+    page,
+    setPage,
+    totalPages,
+    pageSize,
+    totalItems,
+  } = usePagination(transactions);
 
   async function handleClear() {
     await clearTransactionHistory();
@@ -157,47 +167,52 @@ export function TransactionLedger() {
           )}
         </CardHeader>
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Date</TableHead>
+                <TableHead>Customer</TableHead>
+                <TableHead className="hidden sm:table-cell">Reason</TableHead>
+                <TableHead className="text-right">Activity</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {transactions.length === 0 ? (
                 <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Customer</TableHead>
-                  <TableHead className="hidden sm:table-cell">Reason</TableHead>
-                  <TableHead className="text-right">Activity</TableHead>
+                  <TableCell colSpan={4} className="py-8 text-center text-muted-foreground">
+                    No transactions yet.
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {transactions.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={4} className="py-8 text-center text-muted-foreground">
-                      No transactions yet.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  transactions.map((txn) => {
-                    const customer = getCustomerById(txn.customerId);
-                    return (
-                      <TableRow key={txn.id}>
-                        <TableCell className="whitespace-nowrap text-muted-foreground">
-                          {formatTransactionDate(txn.createdAt)}
-                        </TableCell>
-                        <TableCell className="font-medium">
-                          {customer?.name ?? "Unknown"}
-                        </TableCell>
-                        <TableCell className="hidden sm:table-cell max-w-[240px] truncate text-muted-foreground">
-                          {txn.reason}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <TransactionBadge txn={txn} />
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })
-                )}
-              </TableBody>
-            </Table>
-          </div>
+              ) : (
+                paginatedItems.map((txn) => {
+                  const customer = getCustomerById(txn.customerId);
+                  return (
+                    <TableRow key={txn.id}>
+                      <TableCell className="whitespace-nowrap text-muted-foreground">
+                        {formatTransactionDate(txn.createdAt)}
+                      </TableCell>
+                      <TableCell className="font-medium">
+                        {customer?.name ?? "Unknown"}
+                      </TableCell>
+                      <TableCell className="hidden sm:table-cell max-w-[240px] truncate text-muted-foreground">
+                        {txn.reason}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <TransactionBadge txn={txn} />
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
+            </TableBody>
+          </Table>
+          <ListPagination
+            page={page}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            pageSize={pageSize}
+            onPageChange={setPage}
+          />
         </CardContent>
       </Card>
 

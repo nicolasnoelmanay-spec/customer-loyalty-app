@@ -2,9 +2,11 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Lock, Sparkles, UserPlus } from "lucide-react";
+import { KeyRound, Lock, Sparkles, UserPlus } from "lucide-react";
 import { AppHeader } from "@/components/app-header";
+import { CustomerForgotPasswordForm } from "@/components/customer/customer-forgot-password-form";
 import { CustomerLoginForm } from "@/components/customer/customer-login-form";
+import { CustomerResetPasswordForm } from "@/components/customer/customer-reset-password-form";
 import { MemberRegistrationForm } from "@/components/register/member-registration-form";
 import { Button } from "@/components/ui/button";
 import {
@@ -33,17 +35,23 @@ function LoginPageContent() {
     isAuthenticated: customerAuthenticated,
   } = useCustomerAuth();
   const [tab, setTab] = useState<LoginTab>("staff");
+  const [customerView, setCustomerView] = useState<"login" | "forgot">("login");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const resetToken = searchParams.get("token")?.trim() ?? "";
+  const isResetMode = searchParams.get("reset") === "1" && resetToken.length > 0;
 
   useEffect(() => {
     if (searchParams.get("join") === "1") {
       setTab("join");
-    } else if (searchParams.get("customer") === "1") {
+    } else if (searchParams.get("customer") === "1" || isResetMode) {
       setTab("customer");
     }
-  }, [searchParams]);
+    if (searchParams.get("forgot") === "1") {
+      setCustomerView("forgot");
+    }
+  }, [searchParams, isResetMode]);
 
   useEffect(() => {
     if (staffReady && staffAuthenticated) {
@@ -72,24 +80,35 @@ function LoginPageContent() {
     return null;
   }
 
-  const headerCopy =
-    tab === "staff"
-      ? {
-          title: "Staff Login",
-          description: `Sign in to access the ${loyaltyConfig.programName} dashboard.`,
-          icon: Lock,
-        }
-      : tab === "customer"
+  const headerCopy = isResetMode
+    ? {
+        title: "Reset Password",
+        description: "Choose a new password for your member account.",
+        icon: KeyRound,
+      }
+    : tab === "staff"
+    ? {
+        title: "Staff Login",
+        description: `Sign in to access the ${loyaltyConfig.programName} dashboard.`,
+        icon: Lock,
+      }
+    : tab === "customer"
+      ? customerView === "forgot"
         ? {
+            title: "Forgot Password",
+            description: "We'll email you a link to reset your password.",
+            icon: KeyRound,
+          }
+        : {
             title: "Customer Login",
             description: `Sign in with your member username and password.`,
             icon: Sparkles,
           }
-        : {
-            title: "Member Registration",
-            description: `Join ${loyaltyConfig.programName} to earn rewards on every visit.`,
-            icon: UserPlus,
-          };
+      : {
+          title: "Member Registration",
+          description: `Join ${loyaltyConfig.programName} to earn rewards on every visit.`,
+          icon: UserPlus,
+        };
 
   const HeaderIcon = headerCopy.icon;
 
@@ -106,9 +125,17 @@ function LoginPageContent() {
             <CardDescription>{headerCopy.description}</CardDescription>
           </CardHeader>
           <CardContent>
+            {isResetMode ? (
+              <CustomerResetPasswordForm token={resetToken} />
+            ) : (
             <Tabs
               value={tab}
-              onValueChange={(value) => setTab(value as LoginTab)}
+              onValueChange={(value) => {
+                setTab(value as LoginTab);
+                if (value === "customer") {
+                  setCustomerView("login");
+                }
+              }}
             >
               <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="staff">Staff</TabsTrigger>
@@ -152,7 +179,18 @@ function LoginPageContent() {
                 </form>
               </TabsContent>
               <TabsContent value="customer" className="mt-4">
-                <CustomerLoginForm embedded onJoinClick={() => setTab("join")} />
+                {customerView === "forgot" ? (
+                  <CustomerForgotPasswordForm
+                    embedded
+                    onBackClick={() => setCustomerView("login")}
+                  />
+                ) : (
+                  <CustomerLoginForm
+                    embedded
+                    onJoinClick={() => setTab("join")}
+                    onForgotClick={() => setCustomerView("forgot")}
+                  />
+                )}
               </TabsContent>
               <TabsContent value="join" className="mt-4">
                 <MemberRegistrationForm
@@ -161,6 +199,7 @@ function LoginPageContent() {
                 />
               </TabsContent>
             </Tabs>
+            )}
           </CardContent>
         </Card>
       </main>

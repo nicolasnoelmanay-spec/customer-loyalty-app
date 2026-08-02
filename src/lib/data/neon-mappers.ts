@@ -6,6 +6,7 @@ export interface CustomerRow {
   phone: string;
   email: string;
   username: string | null;
+  password_hash: string | null;
   points: number;
   total_points_earned: number;
   consecutive_points_earned: number;
