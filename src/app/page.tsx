@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowRight, Gift, LogIn, Search, UserPlus, Users } from "lucide-react";
 import { AppHeader } from "@/components/app-header";
+import { RegistrationQrImage } from "@/components/qr/registration-qr-image";
 import { buttonVariants } from "@/components/ui/button";
 import {
   Card,
@@ -83,6 +84,14 @@ export default function HomePage() {
                   Staff can search members by phone or email after signing in.
                 </CardDescription>
               </CardHeader>
+            </Card>
+          </div>
+
+          <div className="mx-auto mt-20 max-w-sm">
+            <Card className="p-6">
+              <div className="flex justify-center">
+                <RegistrationQrImage size={220} title="Join Now" />
+              </div>
             </Card>
           </div>
         </section>

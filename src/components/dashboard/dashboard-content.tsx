@@ -5,6 +5,7 @@ import { CustomerDirectory } from "@/components/dashboard/customer-directory";
 import { DashboardSkeleton } from "@/components/dashboard/dashboard-skeleton";
 import { LogPurchaseDialog } from "@/components/dashboard/log-purchase-dialog";
 import { RedeemPointsDialog } from "@/components/dashboard/redeem-points-dialog";
+import { RegistrationQrDialog } from "@/components/dashboard/registration-qr-dialog";
 import { ScanCustomerDialog } from "@/components/dashboard/scan-customer-dialog";
 import { TransactionLedger } from "@/components/dashboard/transaction-ledger";
 import { loyaltyConfig } from "@/config/loyalty";
@@ -26,6 +27,7 @@ export function DashboardContent() {
           {isReady && (
             <>
               <AddCustomerDialog />
+              <RegistrationQrDialog />
               <ScanCustomerDialog />
               <LogPurchaseDialog />
               <RedeemPointsDialog />
