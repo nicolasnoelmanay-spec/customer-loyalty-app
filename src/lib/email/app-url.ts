@@ -9,15 +9,23 @@ export const PRODUCTION_APP_URL =
  */
 export function getAppUrl(): string {
   const explicit = process.env.NEXT_PUBLIC_APP_URL?.trim();
-  if (explicit) return normalizeOrigin(explicit);
+  if (explicit && !isLocalHost(explicit)) return normalizeOrigin(explicit);
 
   const productionHost = process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim();
-  if (productionHost) return normalizeOrigin(productionHost);
+  if (productionHost && !isLocalHost(productionHost)) {
+    return normalizeOrigin(productionHost);
+  }
 
   const vercel = process.env.VERCEL_URL?.trim();
-  if (vercel) return normalizeOrigin(vercel);
+  if (vercel && !isLocalHost(vercel)) return normalizeOrigin(vercel);
 
   return PRODUCTION_APP_URL;
+}
+
+function isLocalHost(value: string): boolean {
+  return /^(https?:\/\/)?(localhost|127\.0\.0\.1)(:\d+)?\/?$/i.test(
+    value.trim()
+  );
 }
 
 function normalizeOrigin(value: string): string {

@@ -88,7 +88,10 @@ export function CustomerQrImage({
       <div className="flex flex-col items-center gap-3">
         <div
           className="flex items-center justify-center rounded-xl border bg-muted text-sm text-muted-foreground"
-          style={{ width: cardSize.width, height: cardSize.height }}
+          style={{
+            width: `${cardSize.width}px`,
+            height: `${cardSize.height}px`,
+          }}
         >
           Loading QR…
         </div>

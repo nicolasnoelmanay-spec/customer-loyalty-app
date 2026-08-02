@@ -27,33 +27,7 @@ function loadImage(src: string): Promise<HTMLImageElement> {
   });
 }
 
-function wrapTitleLines(
-  context: CanvasRenderingContext2D,
-  title: string,
-  maxWidth: number
-): string[] {
-  const words = title.split(/\s+/);
-  const lines: string[] = [];
-  let current = "";
-
-  for (const word of words) {
-    const candidate = current ? `${current} ${word}` : word;
-    if (context.measureText(candidate).width > maxWidth && current) {
-      lines.push(current);
-      current = word;
-    } else {
-      current = candidate;
-    }
-  }
-
-  if (current) {
-    lines.push(current);
-  }
-
-  return lines;
-}
-
-function estimateTitleLayout(title: string): { lines: string[]; titleAreaHeight: number } {
+function layoutTitle(title: string): { lines: string[]; titleAreaHeight: number } {
   const words = title.split(/\s+/);
   const lines: string[] = [];
   let current = "";
@@ -80,27 +54,6 @@ function estimateTitleLayout(title: string): { lines: string[]; titleAreaHeight:
   return { lines, titleAreaHeight };
 }
 
-function measureTitleLayout(title: string, qrSize: number) {
-  if (typeof document === "undefined") {
-    return estimateTitleLayout(title);
-  }
-
-  const canvas = document.createElement("canvas");
-  const context = canvas.getContext("2d");
-  if (!context) {
-    throw new Error("Canvas is not supported.");
-  }
-
-  context.font = TITLE_FONT;
-  const lines = wrapTitleLines(context, title, qrSize);
-  const titleAreaHeight = Math.max(
-    36,
-    lines.length * TITLE_LINE_HEIGHT + TITLE_VERTICAL_PADDING
-  );
-
-  return { lines, titleAreaHeight };
-}
-
 export async function createRegistrationQrCardDataUrl(
   title: string,
   qrSize: number
@@ -109,7 +62,7 @@ export async function createRegistrationQrCardDataUrl(
   const qrImage = await loadImage(qrDataUrl);
 
   const padding = 20;
-  const { lines, titleAreaHeight } = measureTitleLayout(title, qrSize);
+  const { lines, titleAreaHeight } = layoutTitle(title);
   const canvas = document.createElement("canvas");
   canvas.width = qrSize + padding * 2;
   canvas.height = qrSize + padding * 2 + titleAreaHeight;
@@ -146,7 +99,7 @@ export function getRegistrationQrCardDimensions(
   title: string = getMemberRegistrationQrTitle()
 ) {
   const padding = 20;
-  const { titleAreaHeight } = measureTitleLayout(title, qrSize);
+  const { titleAreaHeight } = layoutTitle(title);
   return {
     width: qrSize + padding * 2,
     height: qrSize + padding * 2 + titleAreaHeight,

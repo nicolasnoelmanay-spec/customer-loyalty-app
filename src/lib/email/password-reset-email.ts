@@ -1,5 +1,5 @@
 import { loyaltyConfig } from "@/config/loyalty";
-import { getAppUrl } from "@/lib/email/app-url";
+import { PRODUCTION_APP_URL } from "@/lib/email/app-url";
 import { PASSWORD_RESET_TOKEN_HOURS } from "@/lib/auth/password-reset-token";
 import { sendEmail } from "@/lib/email/send-email";
 
@@ -19,7 +19,7 @@ function escapeHtml(value: string): string {
 
 function buildPasswordResetEmailContent(input: PasswordResetEmailInput) {
   const brandName = loyaltyConfig.email.brandName;
-  const resetUrl = `${getAppUrl()}/login?reset=1&token=${encodeURIComponent(input.token)}`;
+  const resetUrl = `${PRODUCTION_APP_URL}/login?reset=1&token=${encodeURIComponent(input.token)}`;
   const subject = `Reset your ${brandName} password`;
 
   const text = [
