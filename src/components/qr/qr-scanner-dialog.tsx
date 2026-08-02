@@ -96,7 +96,12 @@ export function QrScannerDialog({
           { facingMode },
           {
             fps: 10,
-            qrbox: { width: 250, height: 250 },
+            qrbox: (viewfinderWidth, viewfinderHeight) => {
+              const size = Math.floor(
+                Math.min(viewfinderWidth, viewfinderHeight) * 0.75
+              );
+              return { width: size, height: size };
+            },
             aspectRatio: 1,
           },
           (decoded) => handleDecoded(decoded),
@@ -131,7 +136,7 @@ export function QrScannerDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="w-[calc(100%-1rem)] max-w-md max-h-[90dvh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Camera className="size-5" />
@@ -142,7 +147,7 @@ export function QrScannerDialog({
 
         <div className="space-y-3">
           <div className="overflow-hidden rounded-xl border bg-black/5">
-            <div id={regionId} className="min-h-[260px] w-full" />
+            <div id={regionId} className="min-h-[220px] w-full sm:min-h-[260px]" />
           </div>
           {isStarting && (
             <p className="text-sm text-muted-foreground text-center">
@@ -154,7 +159,7 @@ export function QrScannerDialog({
           )}
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="[&_button]:w-full sm:[&_button]:w-auto">
           <Button type="button" variant="outline" onClick={toggleCamera}>
             <SwitchCamera className="size-4" />
             Switch Camera

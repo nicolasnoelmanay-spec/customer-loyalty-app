@@ -23,6 +23,12 @@ export const metadata: Metadata = {
     "Manage customer loyalty points, track purchases, and let customers check their rewards.",
 };
 
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{

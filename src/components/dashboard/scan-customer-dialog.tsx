@@ -57,11 +57,15 @@ export function ScanCustomerDialog() {
           if (!next) reset();
         }}
       >
-        <DialogTrigger render={<Button size="sm" variant="outline" />}>
+        <DialogTrigger
+          render={
+            <Button size="sm" variant="outline" className="w-full sm:w-auto" />
+          }
+        >
           <ScanLine className="size-4" />
           Scan QR
         </DialogTrigger>
-        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-[calc(100%-1rem)] max-w-lg max-h-[90dvh] overflow-y-auto p-4 sm:p-6">
           <DialogHeader>
             <DialogTitle>Scan Customer</DialogTitle>
             <DialogDescription>
@@ -72,7 +76,7 @@ export function ScanCustomerDialog() {
           <div className="space-y-4">
             <Button
               type="button"
-              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
+              className="h-11 w-full bg-emerald-600 hover:bg-emerald-700 text-white"
               onClick={() => setScannerOpen(true)}
             >
               <ScanLine className="size-4" />
@@ -84,27 +88,30 @@ export function ScanCustomerDialog() {
             {foundCustomer && (
               <>
                 <div className="rounded-xl border bg-muted/40 p-4 space-y-3">
-                  <div>
-                    <p className="font-medium text-lg">{foundCustomer.name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {foundCustomer.phone} · {foundCustomer.email}
+                  <div className="space-y-1">
+                    <p className="font-medium text-lg break-words">{foundCustomer.name}</p>
+                    <p className="text-sm text-muted-foreground break-all">
+                      {foundCustomer.phone}
+                    </p>
+                    <p className="text-sm text-muted-foreground break-all">
+                      {foundCustomer.email}
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <Badge variant="secondary">
+                    <Badge variant="secondary" className="text-xs sm:text-sm">
                       {foundCustomer.points.toLocaleString()} pts
                     </Badge>
-                    <Badge variant="secondary">
+                    <Badge variant="secondary" className="text-xs sm:text-sm">
                       {foundCustomer.vouchersAvailable} × 50% off
                     </Badge>
-                    <Badge variant="secondary">
+                    <Badge variant="secondary" className="text-xs sm:text-sm">
                       {foundCustomer.freeDrinkVouchersAvailable} × free drink
                     </Badge>
                   </div>
                   <Button
                     type="button"
                     variant="outline"
-                    className="w-full"
+                    className="h-11 w-full"
                     onClick={() => setQrOpen(true)}
                   >
                     View Customer QR
