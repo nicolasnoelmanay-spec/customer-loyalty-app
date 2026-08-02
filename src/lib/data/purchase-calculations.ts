@@ -35,16 +35,10 @@ export function getUnitPrice(
 ): number {
   let price = product.price;
   if (isDrinkCategory(product.category) && temperature === "iced") {
-    price =
-      product.icedPrice ??
-      product.price + loyaltyConfig.icedDrinkSurcharge;
+    price = product.icedPrice ?? product.price;
   }
   price += getQuarterPounderOptionSurcharge(quarterPounderOption);
   return price;
-}
-
-export function icedDrinkSurchargeLabel(): string {
-  return formatCurrency(loyaltyConfig.icedDrinkSurcharge);
 }
 
 export function productQualifiesForPoints(
