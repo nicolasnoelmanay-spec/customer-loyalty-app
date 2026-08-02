@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { ArrowRight, Gift, LogIn, Search, UserPlus, Users } from "lucide-react";
 import { AppHeader } from "@/components/app-header";
-import { RegistrationQrImage } from "@/components/qr/registration-qr-image";
 import { buttonVariants } from "@/components/ui/button";
 import {
   Card,
@@ -19,8 +18,15 @@ export default function HomePage() {
       <main className="flex-1">
         <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-24">
           <div className="mx-auto max-w-2xl text-center">
-            <div className="mx-auto mb-6 flex size-16 items-center justify-center rounded-2xl bg-emerald-600 text-white shadow-lg shadow-emerald-600/25">
-              <Gift className="size-8" />
+            <div className="mx-auto mb-8 flex justify-center">
+              {/* eslint-disable-next-line @next/next/no-img-element -- preserve logo alpha without image optimizer cache */}
+              <img
+                src="/coffeesentials-mark.png"
+                alt="Coffeesentials"
+                width={320}
+                height={320}
+                className="size-60 object-contain sm:size-72"
+              />
             </div>
             <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
               {loyaltyConfig.programName}
@@ -84,14 +90,6 @@ export default function HomePage() {
                   Staff can search members by phone or email after signing in.
                 </CardDescription>
               </CardHeader>
-            </Card>
-          </div>
-
-          <div className="mx-auto mt-20 max-w-sm">
-            <Card className="p-6">
-              <div className="flex justify-center">
-                <RegistrationQrImage size={220} />
-              </div>
             </Card>
           </div>
         </section>
