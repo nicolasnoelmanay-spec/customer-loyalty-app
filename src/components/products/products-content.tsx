@@ -323,7 +323,7 @@ export function ProductsContent() {
     }
 
     return (
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="grid grid-cols-2 gap-2 sm:gap-4 xl:grid-cols-3">
         {filtered.map((product) => {
           const Icon = categoryIcon(product.category);
           const cartKey = cartKeyForProduct(product);
@@ -338,43 +338,56 @@ export function ProductsContent() {
           );
 
           return (
-            <Card key={product.id} className="overflow-hidden">
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <CardTitle className="text-base">{product.name}</CardTitle>
+            <Card key={product.id} size="sm" className="overflow-hidden">
+              <CardHeader className="pb-2 sm:pb-3">
+                <div className="flex items-start justify-between gap-2 sm:gap-3">
+                  <div className="min-w-0">
+                    <CardTitle className="text-sm leading-snug sm:text-base">
+                      {product.name}
+                    </CardTitle>
                   </div>
-                  <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300">
-                    <Icon className="size-5" />
+                  <div className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-800 sm:size-10 sm:rounded-xl dark:bg-amber-950 dark:text-amber-300">
+                    <Icon className="size-3.5 sm:size-5" />
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge variant="secondary">{formatCurrency(unitPrice)}</Badge>
+              <CardContent className="space-y-2.5 sm:space-y-4">
+                <div className="flex flex-wrap items-center gap-1 sm:gap-2">
+                  <Badge variant="secondary" className="text-[0.7rem] sm:text-xs">
+                    {formatCurrency(unitPrice)}
+                  </Badge>
                   {productQualifiesForPoints(product, selectedTemp) ? (
-                    <Badge variant="secondary" className="bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                    <Badge
+                      variant="secondary"
+                      className="bg-emerald-100 text-[0.7rem] text-emerald-800 sm:text-xs dark:bg-emerald-950 dark:text-emerald-300"
+                    >
                       +{loyaltyConfig.pointsPerDrink} pt
                     </Badge>
                   ) : !isDrinkCategory(product.category) ? (
-                    <Badge variant="secondary">No points</Badge>
+                    <Badge variant="secondary" className="text-[0.7rem] sm:text-xs">
+                      No points
+                    </Badge>
                   ) : null}
                   {productIsHotOnlyDrink(product) && (
-                    <Badge variant="outline">Hot only</Badge>
+                    <Badge variant="outline" className="text-[0.7rem] sm:text-xs">
+                      Hot only
+                    </Badge>
                   )}
                   {productIsIcedOnlyDrink(product) && (
-                    <Badge variant="outline">Iced only</Badge>
+                    <Badge variant="outline" className="text-[0.7rem] sm:text-xs">
+                      Iced only
+                    </Badge>
                   )}
                 </div>
                 {productOffersHotCold(product) && (
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
                     {(["hot", "iced"] as const).map((temp) => (
                       <button
                         key={temp}
                         type="button"
                         onClick={() => setProductTemperature(product, temp)}
                         className={cn(
-                          "rounded-md border px-2 py-1.5 text-xs font-medium transition-colors",
+                          "rounded-md border px-1.5 py-1 text-[0.65rem] font-medium transition-colors sm:px-2 sm:py-1.5 sm:text-xs",
                           selectedTemp === temp
                             ? "border-emerald-600 bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"
                             : "border-border hover:bg-muted/50"
@@ -386,14 +399,18 @@ export function ProductsContent() {
                   </div>
                 )}
                 {productOffersQuarterPounderOptions(product) && (
-                  <div className="space-y-2">
-                    <Label className="text-xs text-muted-foreground">Add-ons</Label>
-                    <div className="grid grid-cols-1 gap-2">
+                  <div className="space-y-1.5 sm:space-y-2">
+                    <Label className="text-[0.65rem] text-muted-foreground sm:text-xs">
+                      Add-ons
+                    </Label>
+                    <div className="grid grid-cols-1 gap-1.5 sm:gap-2">
                       <button
                         type="button"
-                        onClick={() => setProductQuarterPounderOption(product, undefined)}
+                        onClick={() =>
+                          setProductQuarterPounderOption(product, undefined)
+                        }
                         className={cn(
-                          "rounded-md border px-2 py-1.5 text-xs font-medium transition-colors text-left",
+                          "rounded-md border px-1.5 py-1 text-left text-[0.65rem] font-medium transition-colors sm:px-2 sm:py-1.5 sm:text-xs",
                           !selectedQuarterPounderOption
                             ? "border-emerald-600 bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"
                             : "border-border hover:bg-muted/50"
@@ -420,7 +437,7 @@ export function ProductsContent() {
                             setProductQuarterPounderOption(product, value)
                           }
                           className={cn(
-                            "rounded-md border px-2 py-1.5 text-xs font-medium transition-colors text-left",
+                            "rounded-md border px-1.5 py-1 text-left text-[0.65rem] font-medium transition-colors sm:px-2 sm:py-1.5 sm:text-xs",
                             selectedQuarterPounderOption === value
                               ? "border-emerald-600 bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"
                               : "border-border hover:bg-muted/50"
@@ -433,34 +450,43 @@ export function ProductsContent() {
                     </div>
                   </div>
                 )}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-center justify-center gap-1.5 sm:justify-start sm:gap-2">
                     <Button
                       type="button"
                       variant="outline"
                       size="icon-sm"
+                      className="size-7 sm:size-8"
                       aria-label={`Decrease ${product.name}`}
                       onClick={() => updateQuantity(cartKey, -1)}
                       disabled={quantity === 0}
                     >
-                      <Minus className="size-4" />
+                      <Minus className="size-3.5 sm:size-4" />
                     </Button>
-                    <span className="w-8 text-center font-medium">{quantity}</span>
+                    <span className="w-6 text-center text-sm font-medium sm:w-8">
+                      {quantity}
+                    </span>
                     <Button
                       type="button"
                       variant="outline"
                       size="icon-sm"
+                      className="size-7 sm:size-8"
                       aria-label={`Increase ${product.name}`}
                       onClick={() => updateQuantity(cartKey, 1)}
                     >
-                      <Plus className="size-4" />
+                      <Plus className="size-3.5 sm:size-4" />
                     </Button>
                   </div>
                   <Button
                     type="button"
                     size="sm"
                     variant={quantity > 0 ? "secondary" : "default"}
-                    className={quantity === 0 ? "bg-emerald-600 hover:bg-emerald-700 text-white" : undefined}
+                    className={cn(
+                      "h-7 w-full text-xs sm:h-8 sm:w-auto sm:text-sm",
+                      quantity === 0
+                        ? "bg-emerald-600 text-white hover:bg-emerald-700"
+                        : undefined
+                    )}
                     onClick={() => updateQuantity(cartKey, 1)}
                   >
                     Add
