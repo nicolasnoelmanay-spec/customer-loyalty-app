@@ -4,6 +4,11 @@ import { useEffect, useState } from "react";
 import { Download } from "lucide-react";
 import QRCode from "qrcode";
 import { buildCustomerQrPayload } from "@/lib/qr/customer-qr";
+import {
+  downloadQrImage,
+  getQrDownloadButtonLabel,
+  getQrDownloadHint,
+} from "@/lib/qr/download-qr-image";
 import { Button } from "@/components/ui/button";
 
 interface CustomerQrImageProps {
@@ -42,6 +47,10 @@ export function CustomerQrImage({
   downloadFileName,
 }: CustomerQrImageProps) {
   const [dataUrl, setDataUrl] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [downloadLabel, setDownloadLabel] = useState("Download QR Code");
+  const [downloadHint, setDownloadHint] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -59,8 +68,28 @@ export function CustomerQrImage({
     };
   }, [customerId, size]);
 
+  useEffect(() => {
+    setDownloadLabel(getQrDownloadButtonLabel());
+    setDownloadHint(getQrDownloadHint());
+  }, []);
+
   const fileName =
     downloadFileName ?? defaultDownloadFileName(customerId, customerName);
+
+  async function handleDownload() {
+    if (!dataUrl || isSaving) return;
+
+    setIsSaving(true);
+    setSaveError(null);
+
+    try {
+      await downloadQrImage(dataUrl, fileName);
+    } catch {
+      setSaveError("Could not save the QR code. Try again or screenshot the code.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
 
   if (!dataUrl) {
     return (
@@ -76,30 +105,35 @@ export function CustomerQrImage({
   }
 
   return (
-    <div className="flex flex-col items-center gap-3">
+    <div className="flex w-full max-w-full flex-col items-center gap-3">
       {/* eslint-disable-next-line @next/next/no-img-element -- QR data URL */}
       <img
         src={dataUrl}
         alt={`QR code for ${customerName}`}
-        className="rounded-xl border bg-white p-3 shadow-sm"
+        className="max-w-full rounded-xl border bg-white p-3 shadow-sm"
         width={size}
         height={size}
       />
       {showDownload && (
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={() => {
-            const link = document.createElement("a");
-            link.href = dataUrl;
-            link.download = fileName;
-            link.click();
-          }}
-        >
-          <Download className="size-4" />
-          Download QR Code
-        </Button>
+        <div className="flex w-full max-w-sm flex-col items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-11 w-full sm:w-auto"
+            disabled={isSaving}
+            onClick={() => void handleDownload()}
+          >
+            <Download className="size-4" />
+            {isSaving ? "Saving..." : downloadLabel}
+          </Button>
+          {downloadHint && !saveError && (
+            <p className="text-center text-xs text-muted-foreground">{downloadHint}</p>
+          )}
+          {saveError && (
+            <p className="text-center text-xs text-destructive">{saveError}</p>
+          )}
+        </div>
       )}
     </div>
   );
@@ -114,8 +148,5 @@ export async function downloadCustomerQrCode(
   const dataUrl = await createCustomerQrDataUrl(customerId, size);
   const fileName =
     downloadFileName ?? defaultDownloadFileName(customerId, customerName);
-  const link = document.createElement("a");
-  link.href = dataUrl;
-  link.download = fileName;
-  link.click();
+  await downloadQrImage(dataUrl, fileName);
 }
