@@ -21,10 +21,10 @@ export const loyaltyConfig = {
   },
   /** Display name for the program */
   programName: "Coffeesentials Loyalty Program",
-  /** Outbound email sender (must be verified in Resend) */
+  /** Outbound email sender (must be connected in SendWith) */
   email: {
     fromName: "Coffeesentials",
-    fromAddress: "coffeesentials@gmail.com",
+    fromAddress: "nicolasnoelmanay@gmail.com",
   },
   /** Consecutive earn streak: 50% off at 7, free drink at 14, then reset */
   streak: {

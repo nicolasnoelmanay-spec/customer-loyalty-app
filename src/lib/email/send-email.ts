@@ -1,6 +1,6 @@
 import { loyaltyConfig } from "@/config/loyalty";
 
-const SENDWITH_API_URL = "https://api.sendwith.email/api/send";
+const SENDWITH_API_URL = "https://sendwith.email/api/send";
 
 export interface SendEmailInput {
   to: string | string[];
@@ -25,7 +25,12 @@ interface SendWithMessage {
 }
 
 function getApiKey(): string {
-  const apiKey = process.env.SENDWITH_API_KEY?.trim();
+  const raw = process.env.SENDWITH_API_KEY?.trim();
+  if (!raw) {
+    throw new Error("SENDWITH_API_KEY is not configured.");
+  }
+
+  const apiKey = raw.replace(/^['"]|['"]$/g, "");
   if (!apiKey) {
     throw new Error("SENDWITH_API_KEY is not configured.");
   }
@@ -126,15 +131,34 @@ function extractMessageId(payload: unknown): string {
   return "sent";
 }
 
+function mapSendWithError(message: string): string {
+  if (/invalid api key/i.test(message)) {
+    return "SendWith rejected the API key. Sign in at sendwith.email, connect nicolasnoelmanay@gmail.com, copy the API key from the dashboard, update SENDWITH_API_KEY in .env.local, and restart the dev server.";
+  }
+
+  return message;
+}
+
 export async function sendEmail(input: SendEmailInput): Promise<{ id: string }> {
-  const response = await fetch(SENDWITH_API_URL, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${getApiKey()}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ message: buildMessage(input) }),
-  });
+  let response: Response;
+  try {
+    response = await fetch(SENDWITH_API_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${getApiKey()}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ message: buildMessage(input) }),
+    });
+  } catch (error) {
+    const cause =
+      error instanceof Error && "cause" in error && error.cause instanceof Error
+        ? error.cause.message
+        : error instanceof Error
+          ? error.message
+          : "Network request failed.";
+    throw new Error(`Could not reach SendWith: ${cause}`);
+  }
 
   let payload: unknown = null;
   try {
@@ -157,7 +181,7 @@ export async function sendEmail(input: SendEmailInput): Promise<{ id: string }> 
           ? (payload as { message: string }).message
           : `Failed to send email (${response.status}).`;
 
-    throw new Error(errorMessage);
+    throw new Error(mapSendWithError(errorMessage));
   }
 
   return { id: extractMessageId(payload) };
