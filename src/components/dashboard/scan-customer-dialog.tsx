@@ -1,10 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Gift, ScanLine } from "lucide-react";
+import { ScanLine } from "lucide-react";
 import { QrScannerDialog } from "@/components/qr/qr-scanner-dialog";
 import { CustomerQrDialog } from "@/components/qr/customer-qr-dialog";
-import { RedeemCustomerForm } from "@/components/dashboard/redeem-customer-form";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,7 +14,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Separator } from "@/components/ui/separator";
 import { useLoyalty } from "@/hooks/use-loyalty";
 import type { Customer } from "@/types";
 
@@ -26,7 +24,6 @@ export function ScanCustomerDialog() {
   const [foundCustomer, setFoundCustomer] = useState<Customer | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [qrOpen, setQrOpen] = useState(false);
-  const [redeemSuccess, setRedeemSuccess] = useState<string | null>(null);
 
   const foundCustomerId = foundCustomer?.id;
 
@@ -39,7 +36,6 @@ export function ScanCustomerDialog() {
   function reset() {
     setFoundCustomer(null);
     setError(null);
-    setRedeemSuccess(null);
   }
 
   function handleScan(customerId: string) {
@@ -50,7 +46,6 @@ export function ScanCustomerDialog() {
     }
     setFoundCustomer(customer);
     setError(null);
-    setRedeemSuccess(null);
   }
 
   return (
@@ -70,8 +65,7 @@ export function ScanCustomerDialog() {
           <DialogHeader>
             <DialogTitle>Scan Customer</DialogTitle>
             <DialogDescription>
-              Scan a customer&apos;s loyalty QR code to look them up and redeem
-              vouchers.
+              Scan a customer&apos;s loyalty QR code to look them up.
             </DialogDescription>
           </DialogHeader>
 
@@ -115,36 +109,6 @@ export function ScanCustomerDialog() {
                   >
                     View Customer QR
                   </Button>
-                </div>
-
-                <Separator />
-
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <Gift className="size-5 text-emerald-600" />
-                    <div>
-                      <p className="font-medium">Redeem Vouchers</p>
-                      <p className="text-sm text-muted-foreground">
-                        Use a voucher from this customer&apos;s stack.
-                      </p>
-                    </div>
-                  </div>
-
-                  {redeemSuccess && (
-                    <p className="text-sm text-emerald-600 dark:text-emerald-400">
-                      {redeemSuccess}
-                    </p>
-                  )}
-
-                  <RedeemCustomerForm
-                    customerId={foundCustomer.id}
-                    showCustomerSelect={false}
-                    defaultMode="voucher"
-                    onSuccess={() =>
-                      setRedeemSuccess("Voucher redeemed successfully.")
-                    }
-                    submitClassName="w-full sm:w-auto"
-                  />
                 </div>
               </>
             )}
