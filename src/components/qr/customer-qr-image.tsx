@@ -70,11 +70,13 @@ export function CustomerQrImage({
   async function handleDownload() {
     if (!dataUrl || isSaving) return;
 
+    // Start save/share before setState so Web Share keeps the user gesture.
+    const savePromise = downloadQrImage(dataUrl, fileName);
     setIsSaving(true);
     setSaveError(null);
 
     try {
-      await downloadQrImage(dataUrl, fileName);
+      await savePromise;
     } catch {
       setSaveError("Could not save the QR code. Try again or screenshot the code.");
     } finally {

@@ -8,39 +8,60 @@ function dataUrlToBlob(dataUrl: string): Blob {
     bytes[index] = binary.charCodeAt(index);
   }
 
-  return new Blob([bytes], { type: mime });
+  return new Blob([bytes], { type: mime || "image/png" });
 }
 
+function isIosDevice(): boolean {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent;
+  // iPadOS 13+ reports as Macintosh but is touch-capable.
+  return (
+    /iPad|iPhone|iPod/.test(ua) ||
+    (navigator.maxTouchPoints > 1 && /Macintosh/.test(ua))
+  );
+}
+
+function isAndroidDevice(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return /Android/i.test(navigator.userAgent);
+}
+
+function isMobileShareDevice(): boolean {
+  return isIosDevice() || isAndroidDevice();
+}
+
+function createQrFile(dataUrl: string, fileName: string): File {
+  const blob = dataUrlToBlob(dataUrl);
+  return new File([blob], fileName, {
+    type: blob.type || "image/png",
+    lastModified: Date.now(),
+  });
+}
+
+/**
+ * True when this device should use the native share sheet for QR images.
+ * Desktop browsers often report canShare(files) but have no useful share
+ * targets — keep those on a plain download path.
+ */
 export function canShareQrImage(): boolean {
-  if (typeof navigator === "undefined" || typeof navigator.canShare !== "function") {
-    return false;
-  }
+  if (typeof navigator === "undefined") return false;
+  if (!isMobileShareDevice()) return false;
+  if (typeof navigator.share !== "function") return false;
+  if (typeof navigator.canShare !== "function") return false;
 
   try {
-    const file = new File([new Blob(["x"], { type: "image/png" })], "qr.png", {
+    const probe = new File([new Uint8Array([137, 80, 78, 71])], "qr.png", {
       type: "image/png",
     });
-    return navigator.canShare({ files: [file] });
+    return navigator.canShare({ files: [probe] });
   } catch {
     return false;
   }
 }
 
-function isIosDevice(): boolean {
-  if (typeof navigator === "undefined") return false;
-  return /iPad|iPhone|iPod/.test(navigator.userAgent);
-}
-
-function openQrImageForSave(blobUrl: string): void {
-  const opened = window.open(blobUrl, "_blank", "noopener,noreferrer");
-  if (!opened) {
-    window.location.assign(blobUrl);
-  }
-}
-
-function triggerBlobDownload(blobUrl: string, fileName: string): void {
+function triggerDataUrlDownload(dataUrl: string, fileName: string): void {
   const link = document.createElement("a");
-  link.href = blobUrl;
+  link.href = dataUrl;
   link.download = fileName;
   link.rel = "noopener";
   link.style.display = "none";
@@ -49,39 +70,55 @@ function triggerBlobDownload(blobUrl: string, fileName: string): void {
   document.body.removeChild(link);
 }
 
+function openQrImageForSave(dataUrl: string): void {
+  // Prefer data: URLs over blob: — blob tabs are often blank/blocked on iOS
+  // after an async share attempt, and get revoked too early.
+  const opened = window.open(dataUrl, "_blank");
+  if (!opened) {
+    // Popup blocked: navigate this tab so the user can long-press Save Image.
+    window.location.assign(dataUrl);
+  }
+}
+
+function fallbackSaveQrImage(dataUrl: string, fileName: string): void {
+  triggerDataUrlDownload(dataUrl, fileName);
+
+  // iOS ignores the download attribute — open the image for long-press save.
+  if (isIosDevice()) {
+    openQrImageForSave(dataUrl);
+  }
+}
+
 export async function downloadQrImage(
   dataUrl: string,
   fileName: string
 ): Promise<void> {
-  const blob = dataUrlToBlob(dataUrl);
-  const file = new File([blob], fileName, { type: blob.type || "image/png" });
+  if (!dataUrl.startsWith("data:image/")) {
+    throw new Error("QR image is not ready yet.");
+  }
 
-  if (typeof navigator.share === "function" && canShareQrImage()) {
+  if (canShareQrImage()) {
+    const file = createQrFile(dataUrl, fileName);
+
     try {
-      await navigator.share({
-        files: [file],
-        title: "Loyalty QR Code",
-      });
-      return;
+      // Share must be the first await after the click to keep the user gesture.
+      if (navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file] });
+        return;
+      }
     } catch (error) {
+      // User dismissed the sheet — do not force a download.
+      if (error instanceof DOMException && error.name === "AbortError") {
+        return;
+      }
       if (error instanceof Error && error.name === "AbortError") {
         return;
       }
+      // NotAllowedError / TypeError / etc. → fall through to download.
     }
   }
 
-  const blobUrl = URL.createObjectURL(blob);
-
-  try {
-    if (isIosDevice()) {
-      openQrImageForSave(blobUrl);
-      return;
-    }
-
-    triggerBlobDownload(blobUrl, fileName);
-  } finally {
-    window.setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
-  }
+  fallbackSaveQrImage(dataUrl, fileName);
 }
 
 export function getQrDownloadButtonLabel(): string {
@@ -90,7 +127,7 @@ export function getQrDownloadButtonLabel(): string {
 
 export function getQrDownloadHint(): string | null {
   if (canShareQrImage()) {
-    return "Choose Save Image from the share menu on your phone.";
+    return "Choose Save Image (or Photos) from the share menu.";
   }
 
   if (isIosDevice()) {
