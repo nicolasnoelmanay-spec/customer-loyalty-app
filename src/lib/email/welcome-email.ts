@@ -1,6 +1,6 @@
 import { after } from "next/server";
 import { loyaltyConfig } from "@/config/loyalty";
-import { getAppUrl } from "@/lib/email/app-url";
+import { getPublicAppUrl } from "@/lib/email/app-url";
 import { sendEmail } from "@/lib/email/send-email";
 
 export interface WelcomeEmailInput {
@@ -18,7 +18,7 @@ function escapeHtml(value: string): string {
 }
 
 function buildWelcomeEmailContent(input: WelcomeEmailInput) {
-  const loginUrl = `${getAppUrl()}/customer/login`;
+  const loginUrl = `${getPublicAppUrl()}/customer/login`;
   const brandName = loyaltyConfig.email.brandName;
   const programName = loyaltyConfig.programName;
   const subject = `Welcome to ${brandName}`;
