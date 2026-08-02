@@ -27,6 +27,7 @@ function readEnvValue(filePath, key) {
 const sourceUrl =
   process.env.SOURCE_DATABASE_URL?.trim() ??
   readEnvValue(".env", "DATABASE_URL");
+
 function resolveTargetUrl() {
   const fromFile = readEnvValue(".env.production.local", "DATABASE_URL");
   if (fromFile?.startsWith("postgres") && fromFile !== "[SENSITIVE]") {
@@ -41,7 +42,7 @@ function resolveTargetUrl() {
   }
 
   const fromProcess = process.env.DATABASE_URL?.trim();
-  if (fromProcess?.startsWith("postgres")) {
+  if (fromProcess?.startsWith("postgres") && fromProcess !== sourceUrl) {
     return fromProcess;
   }
 
@@ -57,7 +58,7 @@ if (!sourceUrl?.startsWith("postgres")) {
 
 if (!targetUrl?.startsWith("postgres")) {
   console.error(
-    "Production DATABASE_URL not found. Run: npx vercel env run production -- node scripts/sync-neon.mjs"
+    "Production DATABASE_URL not found. Run: npx vercel env pull .env.production.local --environment=production --yes"
   );
   process.exit(1);
 }
@@ -76,6 +77,8 @@ CREATE TABLE IF NOT EXISTS customers (
   name TEXT NOT NULL,
   phone TEXT NOT NULL,
   email TEXT NOT NULL,
+  username TEXT UNIQUE,
+  password_hash TEXT,
   points INTEGER NOT NULL DEFAULT 0,
   total_points_earned INTEGER NOT NULL DEFAULT 0,
   consecutive_points_earned INTEGER NOT NULL DEFAULT 0,
@@ -112,7 +115,61 @@ CREATE TABLE IF NOT EXISTS staff_sessions (
   expires_at TIMESTAMPTZ NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+CREATE TABLE IF NOT EXISTS customer_sessions (
+  id TEXT PRIMARY KEY,
+  customer_id TEXT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+  expires_at TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS products (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  category TEXT NOT NULL,
+  price INTEGER NOT NULL,
+  iced_price INTEGER,
+  points_earned INTEGER NOT NULL DEFAULT 0,
+  description TEXT NOT NULL DEFAULT '',
+  active BOOLEAN NOT NULL DEFAULT TRUE,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS pending_orders (
+  id TEXT PRIMARY KEY,
+  customer_id TEXT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+  notes TEXT NOT NULL DEFAULT '',
+  voucher_to_apply TEXT NOT NULL DEFAULT 'none',
+  items JSONB NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS pending_orders_created_at_idx ON pending_orders(created_at DESC);
+
+CREATE TABLE IF NOT EXISTS completed_orders (
+  id TEXT PRIMARY KEY,
+  customer_id TEXT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+  transaction_id TEXT REFERENCES transactions(id) ON DELETE SET NULL,
+  notes TEXT NOT NULL DEFAULT '',
+  voucher_to_apply TEXT NOT NULL DEFAULT 'none',
+  items JSONB NOT NULL,
+  subtotal INTEGER NOT NULL,
+  discount INTEGER NOT NULL,
+  total INTEGER NOT NULL,
+  points_earned INTEGER NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL,
+  completed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS completed_orders_completed_at_idx ON completed_orders(completed_at DESC);
 `;
+
+const MIGRATIONS = [
+  `ALTER TABLE customers ADD COLUMN IF NOT EXISTS username TEXT UNIQUE`,
+  `ALTER TABLE customers ADD COLUMN IF NOT EXISTS password_hash TEXT`,
+  `ALTER TABLE products ADD COLUMN IF NOT EXISTS iced_price INTEGER`,
+];
 
 function endpointHint(url) {
   const match = url.match(/@([^/?]+)/);
@@ -123,6 +180,9 @@ async function ensureSchema(sql) {
   for (const statement of SCHEMA.split(";").map((s) => s.trim()).filter(Boolean)) {
     await sql.query(statement);
   }
+  for (const statement of MIGRATIONS) {
+    await sql.query(statement);
+  }
 }
 
 async function countRows(sql, table) {
@@ -130,25 +190,35 @@ async function countRows(sql, table) {
   return rows[0]?.count ?? 0;
 }
 
+async function readTable(sql, table, orderBy = "created_at ASC") {
+  return sql.query(`SELECT * FROM "${table}" ORDER BY ${orderBy}`);
+}
+
 console.log("Source (local):", endpointHint(sourceUrl));
 console.log("Target (online):", endpointHint(targetUrl));
 console.log("\nEnsuring schema on target...");
 await ensureSchema(target);
 
-const staff = await source`SELECT * FROM staff ORDER BY created_at ASC`;
-const customers = await source`SELECT * FROM customers ORDER BY created_at ASC`;
-const transactions =
-  await source`SELECT * FROM transactions ORDER BY created_at ASC`;
+const staff = await readTable(source, "staff");
+const customers = await readTable(source, "customers");
+const products = await readTable(source, "products", "sort_order ASC");
+const transactions = await readTable(source, "transactions");
+const pendingOrders = await readTable(source, "pending_orders");
+const completedOrders = await readTable(source, "completed_orders");
 
 console.log(
-  `Read from source: ${staff.length} staff, ${customers.length} customers, ${transactions.length} transactions`
+  `Read from source: ${staff.length} staff, ${customers.length} customers, ${products.length} products, ${transactions.length} transactions, ${pendingOrders.length} pending orders, ${completedOrders.length} completed orders`
 );
 
 console.log("Replacing target data...");
 await target`DELETE FROM staff_sessions`;
+await target`DELETE FROM customer_sessions`;
+await target`DELETE FROM completed_orders`;
+await target`DELETE FROM pending_orders`;
 await target`DELETE FROM transactions`;
 await target`DELETE FROM customers`;
 await target`DELETE FROM staff`;
+await target`DELETE FROM products`;
 
 for (const row of staff) {
   await target`
@@ -162,16 +232,31 @@ for (const row of staff) {
 for (const row of customers) {
   await target`
     INSERT INTO customers (
-      id, name, phone, email, points, total_points_earned,
+      id, name, phone, email, username, password_hash, points, total_points_earned,
       consecutive_points_earned, vouchers_available,
       free_drink_vouchers_available, total_vouchers_earned,
       total_free_drink_vouchers_earned, created_at
     )
     VALUES (
-      ${row.id}, ${row.name}, ${row.phone}, ${row.email}, ${row.points},
+      ${row.id}, ${row.name}, ${row.phone}, ${row.email}, ${row.username ?? null},
+      ${row.password_hash ?? null}, ${row.points},
       ${row.total_points_earned}, ${row.consecutive_points_earned},
       ${row.vouchers_available}, ${row.free_drink_vouchers_available},
       ${row.total_vouchers_earned}, ${row.total_free_drink_vouchers_earned},
+      ${row.created_at}
+    )
+  `;
+}
+
+for (const row of products) {
+  await target`
+    INSERT INTO products (
+      id, name, category, price, iced_price, points_earned, description, active,
+      sort_order, created_at
+    )
+    VALUES (
+      ${row.id}, ${row.name}, ${row.category}, ${row.price}, ${row.iced_price},
+      ${row.points_earned}, ${row.description}, ${row.active}, ${row.sort_order},
       ${row.created_at}
     )
   `;
@@ -187,11 +272,33 @@ for (const row of transactions) {
   `;
 }
 
-const targetStaff = await countRows(target, "staff");
-const targetCustomers = await countRows(target, "customers");
-const targetTransactions = await countRows(target, "transactions");
+for (const row of pendingOrders) {
+  await target`
+    INSERT INTO pending_orders (
+      id, customer_id, notes, voucher_to_apply, items, created_at
+    )
+    VALUES (
+      ${row.id}, ${row.customer_id}, ${row.notes}, ${row.voucher_to_apply},
+      ${row.items}, ${row.created_at}
+    )
+  `;
+}
+
+for (const row of completedOrders) {
+  await target`
+    INSERT INTO completed_orders (
+      id, customer_id, transaction_id, notes, voucher_to_apply, items, subtotal,
+      discount, total, points_earned, created_at, completed_at
+    )
+    VALUES (
+      ${row.id}, ${row.customer_id}, ${row.transaction_id}, ${row.notes},
+      ${row.voucher_to_apply}, ${row.items}, ${row.subtotal}, ${row.discount},
+      ${row.total}, ${row.points_earned}, ${row.created_at}, ${row.completed_at}
+    )
+  `;
+}
 
 console.log("\nSync complete.");
 console.log(
-  `Target now has: ${targetStaff} staff, ${targetCustomers} customers, ${targetTransactions} transactions`
+  `Target now has: ${await countRows(target, "staff")} staff, ${await countRows(target, "customers")} customers, ${await countRows(target, "products")} products, ${await countRows(target, "transactions")} transactions, ${await countRows(target, "pending_orders")} pending orders, ${await countRows(target, "completed_orders")} completed orders`
 );
