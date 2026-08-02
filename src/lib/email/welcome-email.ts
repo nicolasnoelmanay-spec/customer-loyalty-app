@@ -1,10 +1,11 @@
 import { after } from "next/server";
 import { loyaltyConfig } from "@/config/loyalty";
+import { PRODUCTION_APP_URL } from "@/lib/email/app-url";
 import { sendEmail } from "@/lib/email/send-email";
 
 /** Canonical member login link used in welcome emails. */
 export const MEMBER_WELCOME_LOGIN_URL =
-  "https://loyaltyprogram.coffeesentials.online/login?customer=1";
+  `${PRODUCTION_APP_URL}/login?customer=1`;
 
 export interface WelcomeEmailInput {
   name: string;
