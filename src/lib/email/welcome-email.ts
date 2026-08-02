@@ -48,7 +48,7 @@ function escapeHtml(value: string): string {
 export async function sendWelcomeEmail(
   input: WelcomeEmailInput
 ): Promise<{ id: string } | null> {
-  if (!process.env.RESEND_API_KEY?.trim()) {
+  if (!process.env.SENDWITH_API_KEY?.trim()) {
     return null;
   }
 
