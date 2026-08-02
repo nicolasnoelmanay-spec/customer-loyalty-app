@@ -1,6 +1,6 @@
 import { loyaltyConfig } from "@/config/loyalty";
 
-const SENDWITH_API_URL = "https://sendwith.email/api/send";
+const SENDWITH_API_URL = "https://app.sendwith.email/api/send";
 
 export interface SendEmailInput {
   to: string | string[];
