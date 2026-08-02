@@ -52,7 +52,7 @@ export async function createCustomerQrCardDataUrl(
   context.fillRect(0, 0, canvas.width, canvas.height);
 
   context.fillStyle = QR_COLORS.dark;
-  context.font = "600 18px Geist, system-ui, sans-serif";
+  context.font = "600 18px Arial, Helvetica, sans-serif";
   context.textAlign = "center";
   context.textBaseline = "middle";
   context.fillText(

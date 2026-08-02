@@ -1,5 +1,5 @@
 import { loyaltyConfig } from "@/config/loyalty";
-import { getAppUrl } from "@/lib/email/app-url";
+import { PRODUCTION_APP_URL } from "@/lib/email/app-url";
 
 export const MEMBER_REGISTRATION_PATH = "/login?join=1";
 
@@ -7,13 +7,11 @@ export function getMemberRegistrationQrTitle(): string {
   return `Scan The Code To Join The ${loyaltyConfig.programName}`;
 }
 
+/**
+ * Join URL encoded in registration QR codes.
+ * Always uses the production domain so downloaded/printed codes work for
+ * customers (never localhost or a preview deployment origin).
+ */
 export function getMemberRegistrationUrl(): string {
-  const configured = process.env.NEXT_PUBLIC_APP_URL?.trim();
-  const base = configured
-    ? configured.replace(/\/$/, "")
-    : typeof window !== "undefined"
-      ? window.location.origin
-      : getAppUrl();
-
-  return `${base}${MEMBER_REGISTRATION_PATH}`;
+  return `${PRODUCTION_APP_URL}${MEMBER_REGISTRATION_PATH}`;
 }

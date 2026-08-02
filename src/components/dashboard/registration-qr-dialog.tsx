@@ -27,7 +27,7 @@ export function RegistrationQrDialog() {
         </DialogHeader>
 
         <div className="flex flex-col items-center py-2">
-          <RegistrationQrImage size={260} showDownload />
+          <RegistrationQrImage size={220} showDownload />
         </div>
       </DialogContent>
     </Dialog>

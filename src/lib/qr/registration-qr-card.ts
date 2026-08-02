@@ -6,7 +6,7 @@ const QR_COLORS = {
   light: "#FFFDF8",
 } as const;
 
-const TITLE_FONT = "600 13px Geist, system-ui, sans-serif";
+const TITLE_FONT = "600 13px Arial, Helvetica, sans-serif";
 const TITLE_LINE_HEIGHT = 17;
 const TITLE_VERTICAL_PADDING = 14;
 
@@ -27,7 +27,34 @@ function loadImage(src: string): Promise<HTMLImageElement> {
   });
 }
 
-function layoutTitle(title: string): { lines: string[]; titleAreaHeight: number } {
+function wrapTitleLines(
+  context: CanvasRenderingContext2D,
+  title: string,
+  maxWidth: number
+): string[] {
+  const words = title.split(/\s+/);
+  const lines: string[] = [];
+  let current = "";
+
+  for (const word of words) {
+    const candidate = current ? `${current} ${word}` : word;
+    if (context.measureText(candidate).width > maxWidth && current) {
+      lines.push(current);
+      current = word;
+    } else {
+      current = candidate;
+    }
+  }
+
+  if (current) {
+    lines.push(current);
+  }
+
+  return lines;
+}
+
+/** Document-free estimate for SSR placeholder dimensions only. */
+function estimateTitleLayout(title: string): { titleAreaHeight: number } {
   const words = title.split(/\s+/);
   const lines: string[] = [];
   let current = "";
@@ -46,6 +73,23 @@ function layoutTitle(title: string): { lines: string[]; titleAreaHeight: number 
     lines.push(current);
   }
 
+  return {
+    titleAreaHeight: Math.max(
+      36,
+      lines.length * TITLE_LINE_HEIGHT + TITLE_VERTICAL_PADDING
+    ),
+  };
+}
+
+function measureTitleLayout(title: string, qrSize: number) {
+  const canvas = document.createElement("canvas");
+  const context = canvas.getContext("2d");
+  if (!context) {
+    throw new Error("Canvas is not supported.");
+  }
+
+  context.font = TITLE_FONT;
+  const lines = wrapTitleLines(context, title, qrSize);
   const titleAreaHeight = Math.max(
     36,
     lines.length * TITLE_LINE_HEIGHT + TITLE_VERTICAL_PADDING
@@ -62,7 +106,7 @@ export async function createRegistrationQrCardDataUrl(
   const qrImage = await loadImage(qrDataUrl);
 
   const padding = 20;
-  const { lines, titleAreaHeight } = layoutTitle(title);
+  const { lines, titleAreaHeight } = measureTitleLayout(title, qrSize);
   const canvas = document.createElement("canvas");
   canvas.width = qrSize + padding * 2;
   canvas.height = qrSize + padding * 2 + titleAreaHeight;
@@ -98,8 +142,10 @@ export function getRegistrationQrCardDimensions(
   qrSize: number,
   title: string = getMemberRegistrationQrTitle()
 ) {
+  // Estimate only — never call document/canvas here so SSR matches the
+  // client's first paint (avoids hydration mismatch).
   const padding = 20;
-  const { titleAreaHeight } = layoutTitle(title);
+  const { titleAreaHeight } = estimateTitleLayout(title);
   return {
     width: qrSize + padding * 2,
     height: qrSize + padding * 2 + titleAreaHeight,
