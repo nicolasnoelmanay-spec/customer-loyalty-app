@@ -284,6 +284,19 @@ export async function updateCustomer(
   return mapCustomer((results[0] as CustomerRow[])[0] as CustomerRow);
 }
 
+export async function deleteCustomer(customerId: string): Promise<void> {
+  const sql = getSql();
+  const rows = await sql`
+    DELETE FROM customers
+    WHERE id = ${customerId}
+    RETURNING id
+  `;
+
+  if (rows.length === 0) {
+    throw new Error("Customer not found");
+  }
+}
+
 export async function updateCustomerProfile(
   input: UpdateCustomerProfileInput
 ): Promise<Customer> {
@@ -325,7 +338,7 @@ export async function getProducts(): Promise<Product[]> {
     SELECT *
     FROM products
     WHERE active = TRUE
-    ORDER BY sort_order ASC, name ASC
+    ORDER BY category ASC, name ASC
   `;
   return (rows as ProductRow[]).map(mapProduct);
 }

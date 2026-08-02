@@ -4,7 +4,7 @@ import {
   jsonError,
   requireStaffSession,
 } from "@/lib/api/route-utils";
-import { updateCustomer } from "@/lib/data/neon-repository";
+import { deleteCustomer, updateCustomer, verifyStaffCredentials } from "@/lib/data/neon-repository";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -39,5 +39,31 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json(customer);
   } catch (error) {
     return handleRouteError(error, "Failed to update customer.");
+  }
+}
+
+export async function DELETE(request: NextRequest, { params }: RouteParams) {
+  try {
+    const auth = await requireStaffSession();
+    if ("error" in auth) return auth.error;
+
+    const { id } = await params;
+    const body = await request.json();
+    const username = body.username?.trim();
+    const password = body.password;
+
+    if (!username || !password) {
+      return jsonError("Admin username and password are required.", 400);
+    }
+
+    const staff = await verifyStaffCredentials(username, password);
+    if (!staff) {
+      return jsonError("Invalid admin credentials.", 401);
+    }
+
+    await deleteCustomer(id);
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    return handleRouteError(error, "Failed to delete customer.");
   }
 }

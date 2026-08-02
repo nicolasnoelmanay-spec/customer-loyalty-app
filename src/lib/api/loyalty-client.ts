@@ -81,6 +81,23 @@ export async function apiUpdateCustomer(
   return parseJson(response);
 }
 
+export async function apiDeleteCustomer(input: {
+  customerId: string;
+  adminUsername: string;
+  adminPassword: string;
+}): Promise<void> {
+  const response = await fetch(`/api/customers/${input.customerId}`, {
+    method: "DELETE",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      username: input.adminUsername,
+      password: input.adminPassword,
+    }),
+  });
+  await parseJson(response);
+}
+
 export async function fetchProducts(): Promise<Product[]> {
   const response = await fetch("/api/products");
   const data = await parseJson<{ products: Product[] }>(response);

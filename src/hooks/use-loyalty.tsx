@@ -11,6 +11,7 @@ import {
 import {
   apiAddCustomer,
   apiClearTransactionHistory,
+  apiDeleteCustomer,
   apiLogPurchase,
   apiRedeemFreeDrinkVoucher,
   apiRedeemPoints,
@@ -37,6 +38,11 @@ interface LoyaltyContextValue {
   refresh: () => Promise<void>;
   addCustomer: (input: CreateCustomerInput) => Promise<Customer>;
   updateCustomer: (input: UpdateCustomerInput) => Promise<Customer>;
+  deleteCustomer: (input: {
+    customerId: string;
+    adminUsername: string;
+    adminPassword: string;
+  }) => Promise<void>;
   logPurchase: (input: LogPurchaseInput) => Promise<Transaction>;
   redeemPoints: (input: RedeemPointsInput) => Promise<Transaction>;
   redeemVoucher: (input: RedeemVoucherInput) => Promise<Transaction>;
@@ -123,6 +129,11 @@ export function LoyaltyProvider({ children }: { children: ReactNode }) {
       const customer = await apiUpdateCustomer(input);
       await refresh();
       return customer;
+    },
+    deleteCustomer: async (input) => {
+      if (!isReady || !isAuthenticated) notReady();
+      await apiDeleteCustomer(input);
+      await refresh();
     },
     logPurchase: async (input) => {
       if (!isReady || !isAuthenticated) notReady();

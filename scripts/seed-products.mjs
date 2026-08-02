@@ -1,5 +1,6 @@
 import { neon } from "@neondatabase/serverless";
 import { withIcedPrices } from "./product-iced-price.mjs";
+import { sortProductsForCatalog } from "./product-sort.mjs";
 
 const databaseUrl = process.env.DATABASE_URL?.trim();
 if (!databaseUrl?.startsWith("postgres")) {
@@ -40,7 +41,7 @@ const rawSeedProducts = [
   { id: "prod-quarter-pounder-double-decker", name: "Quarter Pounder - Double Decker", category: "snack", price: 299, points_earned: 0, description: "", sort_order: 28 },
 ];
 
-const seedProducts = withIcedPrices(rawSeedProducts);
+const seedProducts = withIcedPrices(sortProductsForCatalog(rawSeedProducts));
 
 await sql.query(`
 CREATE TABLE IF NOT EXISTS products (

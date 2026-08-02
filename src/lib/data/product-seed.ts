@@ -1,5 +1,6 @@
 import type { Product } from "@/types";
 import { resolveProductIcedPrice } from "@/lib/data/product-iced-prices";
+import { compareProductsByCatalogOrder } from "@/lib/data/product-sort";
 
 const catalog: Omit<Product, "icedPrice">[] = [
   {
@@ -284,7 +285,10 @@ const catalog: Omit<Product, "icedPrice">[] = [
   },
 ];
 
-export const seedProducts: Product[] = catalog.map((product) => ({
-  ...product,
-  icedPrice: resolveProductIcedPrice(product),
-}));
+export const seedProducts: Product[] = [...catalog]
+  .sort(compareProductsByCatalogOrder)
+  .map((product, index) => ({
+    ...product,
+    sortOrder: index,
+    icedPrice: resolveProductIcedPrice(product),
+  }));
