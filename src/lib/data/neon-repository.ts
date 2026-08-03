@@ -131,26 +131,38 @@ export async function authenticateCustomer(input: {
   password: string;
 }): Promise<Customer | null> {
   const bcrypt = await import("bcryptjs");
-  const username = input.username.trim().toLowerCase();
-  if (!username || !input.password) return null;
+  const identifier = input.username.trim();
+  if (!identifier || !input.password) return null;
 
-  const sql = getSql();
-  const rows = await sql`
-    SELECT *
-    FROM customers
-    WHERE LOWER(TRIM(username)) = ${username}
-    LIMIT 1
-  `;
+  const customer = await findCustomerForLogin(identifier);
+  if (!customer) return null;
 
-  if (rows.length === 0) return null;
-
-  const row = rows[0] as CustomerRow & { password_hash: string | null };
-  if (!row.password_hash) return null;
+  const row = await getCustomerRow(customer.id);
+  if (!row?.password_hash) return null;
 
   const valid = await bcrypt.compare(input.password, row.password_hash);
   if (!valid) return null;
 
   return mapCustomer(row);
+}
+
+async function findCustomerForLogin(
+  identifier: string
+): Promise<Customer | null> {
+  const trimmed = identifier.trim();
+  if (!trimmed) return null;
+
+  if (trimmed.includes("@")) {
+    return findCustomerByEmail(trimmed);
+  }
+
+  const byUsername = await findCustomerByUsername(trimmed);
+  if (byUsername) return byUsername;
+
+  const byPhone = await findCustomerByPhone(trimmed);
+  if (byPhone) return byPhone;
+
+  return findCustomerByEmail(trimmed);
 }
 
 export async function getLoyaltyData(): Promise<LoyaltyData> {

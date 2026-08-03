@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { formatTransactionDate } from "@/lib/format-date";
 import { formatStreakProgress, loyaltyConfig } from "@/config/loyalty";
+import { stripCurrencyAmounts } from "@/lib/data/purchase-calculations";
 import { usePagination, CUSTOMER_PAGE_SIZE } from "@/hooks/use-pagination";
 import { CustomerQrImage } from "@/components/qr/customer-qr-image";
 import { Badge } from "@/components/ui/badge";
@@ -127,7 +128,7 @@ export function CustomerAccountDetails({
                       {formatTransactionDate(txn.createdAt)}
                     </TableCell>
                     <TableCell className="hidden sm:table-cell max-w-[200px] truncate text-muted-foreground">
-                      {txn.reason}
+                      {stripCurrencyAmounts(txn.reason)}
                     </TableCell>
                     <TableCell className="text-right">
                       {txn.type === "earn" && (

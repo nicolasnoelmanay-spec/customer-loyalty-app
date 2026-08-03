@@ -13,12 +13,12 @@ export async function POST(request: Request) {
     const password = body.password;
 
     if (!username || !password) {
-      return jsonError("Username and password are required.", 400);
+      return jsonError("Username, email, or phone and password are required.", 400);
     }
 
     const customer = await authenticateCustomer({ username, password });
     if (!customer) {
-      return jsonError("Invalid username or password.", 401);
+      return jsonError("Invalid login credentials.", 401);
     }
 
     const sessionId = await createCustomerSession(customer.id);

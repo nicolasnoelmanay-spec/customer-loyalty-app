@@ -559,6 +559,7 @@ function ProductsContentInner() {
                       className="size-7 sm:size-8"
                       aria-label={`Increase ${product.name}`}
                       onClick={() => updateQuantity(cartKey, 1)}
+                      disabled={quantity === 0}
                     >
                       <Plus className="size-3.5 sm:size-4" />
                     </Button>

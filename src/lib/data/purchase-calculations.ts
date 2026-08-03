@@ -28,6 +28,15 @@ export function formatCurrency(amount: number): string {
   }).format(amount);
 }
 
+/** Remove peso amounts from text shown to customers (e.g. transaction reasons). */
+export function stripCurrencyAmounts(text: string): string {
+  return text
+    .replace(/\s*\(₱[\d,]+(?:\.\d+)?\)/g, "")
+    .replace(/₱[\d,]+(?:\.\d+)?\+?/g, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
 export function getUnitPrice(
   product: Product,
   temperature?: DrinkTemperature,

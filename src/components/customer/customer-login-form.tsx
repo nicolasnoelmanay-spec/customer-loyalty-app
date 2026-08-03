@@ -32,7 +32,7 @@ export function CustomerLoginForm({
     setError("");
 
     if (!username.trim() || !password) {
-      setError("Enter both your username and password.");
+      setError("Enter your username, email, or phone and password.");
       return;
     }
 
@@ -42,7 +42,7 @@ export function CustomerLoginForm({
       if (success) {
         router.replace("/customer");
       } else {
-        setError("Invalid username or password.");
+        setError("Invalid login credentials.");
       }
     } finally {
       setIsSubmitting(false);
@@ -53,13 +53,13 @@ export function CustomerLoginForm({
     <div className={embedded ? "space-y-4" : undefined}>
       <form onSubmit={handleSubmit} className="space-y-4" autoComplete="off">
         <div className="space-y-2">
-          <Label htmlFor="customer-username">Username</Label>
+          <Label htmlFor="customer-username">Username, Email, or Phone</Label>
           <Input
             id="customer-username"
             name="customer-username"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
-            autoComplete="off"
+            autoComplete="username"
           />
         </div>
         <div className="space-y-2">

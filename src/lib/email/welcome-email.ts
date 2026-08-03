@@ -33,10 +33,11 @@ function buildWelcomeEmailContent(input: WelcomeEmailInput) {
     `Welcome to ${programName}! Your member account is ready.`,
     "",
     `Your username: ${input.username}`,
+    `You can also sign in with your registered email or phone number.`,
     "",
     "Here's how it works:",
     `You've received ${loyaltyConfig.registrationBonusPoints} welcome point to get started.`,
-    `- Earn ${loyaltyConfig.pointsPerDrink} point for every qualifying ${loyaltyConfig.drinkLabel} (₱${loyaltyConfig.minDrinkPriceForPoints}+).`,
+    `- Earn ${loyaltyConfig.pointsPerDrink} point for every qualifying ${loyaltyConfig.drinkLabel}.`,
     `- Collect ${loyaltyConfig.voucher.pointsPerVoucher} consecutive points for a ${loyaltyConfig.voucher.label}.`,
     `- Reach ${loyaltyConfig.streak.cycleLength} consecutive points for a ${loyaltyConfig.freeDrinkVoucher.label}.`,
     "",
@@ -50,10 +51,11 @@ function buildWelcomeEmailContent(input: WelcomeEmailInput) {
     <p>Hi ${escapeHtml(input.name)},</p>
     <p>Welcome to <strong>${escapeHtml(programName)}</strong>! Your member account is ready.</p>
     <p>Your username: <strong>${escapeHtml(input.username)}</strong></p>
+    <p>You can also sign in with your registered email or phone number.</p>
     <p>Here's how it works:</p>
     <p>You've received <strong>${loyaltyConfig.registrationBonusPoints} welcome point</strong> to get started.</p>
     <ul>
-      <li>Earn ${loyaltyConfig.pointsPerDrink} point for every qualifying ${escapeHtml(loyaltyConfig.drinkLabel)} (₱${loyaltyConfig.minDrinkPriceForPoints}+).</li>
+      <li>Earn ${loyaltyConfig.pointsPerDrink} point for every qualifying ${escapeHtml(loyaltyConfig.drinkLabel)}.</li>
       <li>Collect ${loyaltyConfig.voucher.pointsPerVoucher} consecutive points for a ${escapeHtml(loyaltyConfig.voucher.label)}.</li>
       <li>Reach ${loyaltyConfig.streak.cycleLength} consecutive points for a ${escapeHtml(loyaltyConfig.freeDrinkVoucher.label)}.</li>
     </ul>
