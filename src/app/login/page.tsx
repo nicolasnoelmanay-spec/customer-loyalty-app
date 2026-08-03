@@ -101,7 +101,7 @@ function LoginPageContent() {
           }
         : {
             title: "Customer Login",
-            description: `Sign in with your username, email, or phone and password.`,
+            description: `Sign in with your member username and password.`,
             icon: Sparkles,
           }
       : {

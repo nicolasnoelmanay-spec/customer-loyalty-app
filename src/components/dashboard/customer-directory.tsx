@@ -25,10 +25,14 @@ import {
 } from "@/components/ui/table";
 import { useLoyalty } from "@/hooks/use-loyalty";
 import { CUSTOMER_PAGE_SIZE, usePagination } from "@/hooks/use-pagination";
+import { isNonMemberCustomer } from "@/lib/data/non-member";
 import type { Customer } from "@/types";
 
 export function CustomerDirectory() {
   const { customers } = useLoyalty();
+  const directoryCustomers = customers.filter(
+    (customer) => !isNonMemberCustomer(customer.id)
+  );
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [qrCustomer, setQrCustomer] = useState<Customer | null>(null);
   const [emailCustomer, setEmailCustomer] = useState<Customer | null>(null);
@@ -39,7 +43,11 @@ export function CustomerDirectory() {
     totalPages,
     pageSize,
     totalItems,
-  } = usePagination(customers, CUSTOMER_PAGE_SIZE, customers.length);
+  } = usePagination(
+    directoryCustomers,
+    CUSTOMER_PAGE_SIZE,
+    directoryCustomers.length
+  );
 
   return (
     <>
@@ -50,8 +58,8 @@ export function CustomerDirectory() {
             Customer Directory
           </CardTitle>
           <CardDescription>
-            {customers.length} registered customer
-            {customers.length !== 1 ? "s" : ""}
+            {directoryCustomers.length} registered customer
+            {directoryCustomers.length !== 1 ? "s" : ""}
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
@@ -81,7 +89,7 @@ export function CustomerDirectory() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {customers.length === 0 ? (
+                {directoryCustomers.length === 0 ? (
                   <TableRow>
                     <TableCell
                       colSpan={9}

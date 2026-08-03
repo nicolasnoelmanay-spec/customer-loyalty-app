@@ -53,7 +53,7 @@ export function CustomerLoginForm({
     <div className={embedded ? "space-y-4" : undefined}>
       <form onSubmit={handleSubmit} className="space-y-4" autoComplete="off">
         <div className="space-y-2">
-          <Label htmlFor="customer-username">Username, Email, or Phone</Label>
+          <Label htmlFor="customer-username">Username</Label>
           <Input
             id="customer-username"
             name="customer-username"
@@ -61,6 +61,9 @@ export function CustomerLoginForm({
             onChange={(e) => setUsername(e.target.value)}
             autoComplete="username"
           />
+          <p className="text-xs text-muted-foreground">
+            You can also sign in with your registered email or phone number.
+          </p>
         </div>
         <div className="space-y-2">
           <div className="flex items-center justify-between gap-2">
