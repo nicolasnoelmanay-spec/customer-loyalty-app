@@ -12,6 +12,7 @@ import {
   apiAddCustomer,
   apiClearTransactionHistory,
   apiDeleteCustomer,
+  apiDeleteTransaction,
   apiLogPurchase,
   apiRedeemFreeDrinkVoucher,
   apiRedeemPoints,
@@ -50,7 +51,8 @@ interface LoyaltyContextValue {
     input: RedeemFreeDrinkVoucherInput
   ) => Promise<Transaction>;
   clearTransactionHistory: () => Promise<void>;
-  findCustomerByContact: (phoneOrEmail: string) => Customer | undefined;
+  deleteTransaction: (transactionId: string) => Promise<void>;
+  findCustomerByContact: (phoneEmailOrName: string) => Customer | undefined;
   getCustomerById: (id: string) => Customer | undefined;
   getTransactionsForCustomer: (customerId: string) => Transaction[];
 }
@@ -164,13 +166,40 @@ export function LoyaltyProvider({ children }: { children: ReactNode }) {
       await apiClearTransactionHistory();
       await refresh();
     },
-    findCustomerByContact: (phoneOrEmail) => {
-      const query = phoneOrEmail.trim().toLowerCase();
-      return customers.find(
-        (c) =>
-          c.phone.toLowerCase().includes(query) ||
-          c.email.toLowerCase() === query
+    deleteTransaction: async (transactionId) => {
+      if (!isReady || !isAuthenticated) notReady();
+      await apiDeleteTransaction(transactionId);
+      await refresh();
+    },
+    findCustomerByContact: (phoneEmailOrName) => {
+      const trimmed = phoneEmailOrName.trim();
+      if (!trimmed) return undefined;
+      const query = trimmed.toLowerCase();
+
+      if (trimmed.includes("@")) {
+        return customers.find((c) => c.email.toLowerCase() === query);
+      }
+
+      const digits = trimmed.replace(/\D/g, "");
+      if (digits) {
+        const byPhone = customers.find(
+          (c) =>
+            c.phone.replace(/\D/g, "").includes(digits) ||
+            c.phone.toLowerCase().includes(query)
+        );
+        if (byPhone) return byPhone;
+      }
+
+      const exactName = customers.find(
+        (c) => c.name.trim().toLowerCase() === query
       );
+      if (exactName) return exactName;
+
+      return customers
+        .filter((c) => c.name.toLowerCase().includes(query))
+        .sort(
+          (a, b) => a.name.length - b.name.length || a.name.localeCompare(b.name)
+        )[0];
     },
     getCustomerById: (id) => customers.find((c) => c.id === id),
     getTransactionsForCustomer: (customerId) =>

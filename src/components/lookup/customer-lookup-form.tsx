@@ -81,14 +81,14 @@ export function CustomerLookupForm() {
           </div>
           <CardTitle>Customer Lookup</CardTitle>
           <CardDescription>
-            Search by phone or email to view a member&apos;s points and recent
-            activity.
+            Search by name, phone, or email to view a member&apos;s points and
+            recent activity.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSearch} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="lookup">Phone or Email</Label>
+              <Label htmlFor="lookup">Name, Phone, or Email</Label>
               <Input
                 id="lookup"
                 value={query}
@@ -96,7 +96,6 @@ export function CustomerLookupForm() {
                   setQuery(e.target.value);
                   setNotFound(false);
                 }}
-                placeholder="nicolas.manay@email.com or +63 917 123 4567"
               />
             </div>
             <Button
@@ -114,8 +113,8 @@ export function CustomerLookupForm() {
       {notFound && (
         <Card className="border-destructive/50">
           <CardContent className="py-6 text-center text-muted-foreground">
-            No account found with that phone or email. Please check your details
-            or ask staff to register you.
+            No account found with that name, phone, or email. Please check your
+            details or ask staff to register you.
           </CardContent>
         </Card>
       )}

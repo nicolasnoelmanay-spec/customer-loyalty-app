@@ -26,6 +26,9 @@ export const loyaltyConfig = {
     brandName: "Coffeesentials",
     fromAddress: "coffeesentials@gmail.com",
   },
+  /** Points granted automatically when a member registers */
+  registrationBonusPoints: 1,
+  registrationBonusReason: "Welcome bonus — new member registration",
   /** Consecutive earn streak: 50% off at 7, free drink at 14, then reset */
   streak: {
     cycleLength: 14,

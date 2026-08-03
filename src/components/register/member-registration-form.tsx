@@ -90,7 +90,9 @@ export function MemberRegistrationForm({
           </div>
           <h2 className="text-lg font-semibold">Welcome, {registeredCustomer.name}!</h2>
           <p className="text-sm text-muted-foreground">
-            You&apos;re now a member of {loyaltyConfig.programName}. A welcome
+            You&apos;re now a member of {loyaltyConfig.programName}. You start
+            with {loyaltyConfig.registrationBonusPoints} welcome point
+            {loyaltyConfig.registrationBonusPoints === 1 ? "" : "s"}. A welcome
             email was sent to {registeredCustomer.email}. Sign in with your
             username and password to view your account, or show your QR code at
             the counter to earn points.
@@ -114,6 +116,10 @@ export function MemberRegistrationForm({
           <p>
             <span className="text-muted-foreground">Email:</span>{" "}
             {registeredCustomer.email}
+          </p>
+          <p>
+            <span className="text-muted-foreground">Points:</span>{" "}
+            {registeredCustomer.points}
           </p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row">

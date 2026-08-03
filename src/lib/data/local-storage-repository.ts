@@ -76,15 +76,35 @@ export class LocalStorageLoyaltyRepository implements LoyaltyRepository {
     return this.data.customers.find((c) => c.id === id);
   }
 
-  findCustomerByContact(phoneOrEmail: string): Customer | undefined {
-    const query = normalizeContact(phoneOrEmail);
-    return this.data.customers.find(
-      (c) =>
-        normalizeContact(c.phone) === query ||
-        normalizeContact(c.email) === query ||
-        c.phone.includes(phoneOrEmail.trim()) ||
-        c.email.toLowerCase() === query
+  findCustomerByContact(phoneEmailOrName: string): Customer | undefined {
+    const trimmed = phoneEmailOrName.trim();
+    if (!trimmed) return undefined;
+
+    const query = normalizeContact(trimmed);
+    if (trimmed.includes("@")) {
+      return this.data.customers.find(
+        (c) => normalizeContact(c.email) === query
+      );
+    }
+
+    const digits = trimmed.replace(/\D/g, "");
+    if (digits) {
+      const byPhone = this.data.customers.find(
+        (c) =>
+          c.phone.replace(/\D/g, "").includes(digits) ||
+          c.phone.includes(trimmed)
+      );
+      if (byPhone) return byPhone;
+    }
+
+    const exactName = this.data.customers.find(
+      (c) => c.name.trim().toLowerCase() === query
     );
+    if (exactName) return exactName;
+
+    return this.data.customers
+      .filter((c) => c.name.toLowerCase().includes(query))
+      .sort((a, b) => a.name.length - b.name.length || a.name.localeCompare(b.name))[0];
   }
 
   getTransactions(): Transaction[] {
@@ -409,6 +429,17 @@ export class LocalStorageLoyaltyRepository implements LoyaltyRepository {
     this.persist({
       ...this.data,
       transactions: [],
+    });
+  }
+
+  deleteTransaction(transactionId: string): void {
+    const exists = this.data.transactions.some((txn) => txn.id === transactionId);
+    if (!exists) throw new Error("Transaction not found.");
+    this.persist({
+      ...this.data,
+      transactions: this.data.transactions.filter(
+        (txn) => txn.id !== transactionId
+      ),
     });
   }
 }

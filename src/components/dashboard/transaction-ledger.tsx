@@ -127,8 +127,16 @@ function TransactionBadge({ txn }: { txn: Transaction }) {
 }
 
 export function TransactionLedger() {
-  const { transactions, getCustomerById, clearTransactionHistory } = useLoyalty();
-  const [confirmOpen, setConfirmOpen] = useState(false);
+  const {
+    transactions,
+    getCustomerById,
+    clearTransactionHistory,
+    deleteTransaction,
+  } = useLoyalty();
+  const [confirmClearOpen, setConfirmClearOpen] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<Transaction | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const {
     paginatedItems,
     page,
@@ -140,7 +148,23 @@ export function TransactionLedger() {
 
   async function handleClear() {
     await clearTransactionHistory();
-    setConfirmOpen(false);
+    setConfirmClearOpen(false);
+  }
+
+  async function handleDeleteOne() {
+    if (!pendingDelete) return;
+    setIsDeleting(true);
+    setDeleteError(null);
+    try {
+      await deleteTransaction(pendingDelete.id);
+      setPendingDelete(null);
+    } catch (err) {
+      setDeleteError(
+        err instanceof Error ? err.message : "Failed to delete transaction."
+      );
+    } finally {
+      setIsDeleting(false);
+    }
   }
 
   return (
@@ -159,7 +183,7 @@ export function TransactionLedger() {
               variant="outline"
               size="sm"
               className="shrink-0 text-destructive hover:text-destructive"
-              onClick={() => setConfirmOpen(true)}
+              onClick={() => setConfirmClearOpen(true)}
             >
               <Trash2 className="size-4" />
               Clear
@@ -174,12 +198,15 @@ export function TransactionLedger() {
                 <TableHead>Customer</TableHead>
                 <TableHead className="hidden sm:table-cell">Reason</TableHead>
                 <TableHead className="text-right">Activity</TableHead>
+                <TableHead className="w-12">
+                  <span className="sr-only">Actions</span>
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {transactions.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={4} className="py-8 text-center text-muted-foreground">
+                  <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
                     No transactions yet.
                   </TableCell>
                 </TableRow>
@@ -200,6 +227,21 @@ export function TransactionLedger() {
                       <TableCell className="text-right">
                         <TransactionBadge txn={txn} />
                       </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="size-8 text-muted-foreground hover:text-destructive"
+                          aria-label={`Delete transaction for ${customer?.name ?? "customer"}`}
+                          onClick={() => {
+                            setDeleteError(null);
+                            setPendingDelete(txn);
+                          }}
+                        >
+                          <Trash2 className="size-4" />
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   );
                 })
@@ -216,7 +258,7 @@ export function TransactionLedger() {
         </CardContent>
       </Card>
 
-      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+      <Dialog open={confirmClearOpen} onOpenChange={setConfirmClearOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Clear transaction history?</DialogTitle>
@@ -227,11 +269,53 @@ export function TransactionLedger() {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setConfirmOpen(false)}>
+            <Button variant="outline" onClick={() => setConfirmClearOpen(false)}>
               Cancel
             </Button>
             <Button variant="destructive" onClick={handleClear}>
               Clear History
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={pendingDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPendingDelete(null);
+            setDeleteError(null);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete this transaction?</DialogTitle>
+            <DialogDescription>
+              This removes the history entry
+              {pendingDelete
+                ? ` for ${getCustomerById(pendingDelete.customerId)?.name ?? "this customer"}`
+                : ""}
+              . Customer point balances will not be changed.
+            </DialogDescription>
+          </DialogHeader>
+          {deleteError && (
+            <p className="text-sm text-destructive">{deleteError}</p>
+          )}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              disabled={isDeleting}
+              onClick={() => setPendingDelete(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={isDeleting}
+              onClick={handleDeleteOne}
+            >
+              {isDeleting ? "Deleting..." : "Delete"}
             </Button>
           </DialogFooter>
         </DialogContent>

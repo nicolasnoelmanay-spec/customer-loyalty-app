@@ -258,6 +258,14 @@ export async function apiClearTransactionHistory(): Promise<void> {
   await parseJson(response);
 }
 
+export async function apiDeleteTransaction(transactionId: string): Promise<void> {
+  const response = await fetch(`/api/transactions/${transactionId}`, {
+    method: "DELETE",
+    credentials: "include",
+  });
+  await parseJson(response);
+}
+
 export async function apiLogin(
   username: string,
   password: string

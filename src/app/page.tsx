@@ -87,7 +87,8 @@ export default function HomePage() {
                 <Search className="mb-2 size-8 text-emerald-600" />
                 <CardTitle>Customer Lookup</CardTitle>
                 <CardDescription>
-                  Staff can search members by phone or email after signing in.
+                  Staff can search members by name, phone, or email after signing
+                  in.
                 </CardDescription>
               </CardHeader>
             </Card>

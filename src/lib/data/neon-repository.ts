@@ -209,17 +209,47 @@ export async function findCustomerByPhone(
   return rows.length > 0 ? mapCustomer(rows[0] as CustomerRow) : null;
 }
 
-export async function findCustomerByContact(
-  phoneOrEmail: string
+export async function findCustomerByName(
+  name: string
 ): Promise<Customer | null> {
-  const trimmed = phoneOrEmail.trim();
+  const normalized = name.trim().toLowerCase();
+  if (!normalized) return null;
+
+  const sql = getSql();
+  const exact = await sql`
+    SELECT *
+    FROM customers
+    WHERE LOWER(TRIM(name)) = ${normalized}
+    LIMIT 1
+  `;
+  if (exact.length > 0) {
+    return mapCustomer(exact[0] as CustomerRow);
+  }
+
+  const partial = await sql`
+    SELECT *
+    FROM customers
+    WHERE LOWER(name) LIKE ${"%" + normalized + "%"}
+    ORDER BY LENGTH(name) ASC, name ASC
+    LIMIT 1
+  `;
+  return partial.length > 0 ? mapCustomer(partial[0] as CustomerRow) : null;
+}
+
+export async function findCustomerByContact(
+  phoneEmailOrName: string
+): Promise<Customer | null> {
+  const trimmed = phoneEmailOrName.trim();
   if (!trimmed) return null;
 
   if (trimmed.includes("@")) {
     return findCustomerByEmail(trimmed);
   }
 
-  return findCustomerByPhone(trimmed);
+  const byPhone = await findCustomerByPhone(trimmed);
+  if (byPhone) return byPhone;
+
+  return findCustomerByName(trimmed);
 }
 
 export async function requestPasswordReset(email: string): Promise<void> {
@@ -382,7 +412,130 @@ export async function registerMember(
     throw new Error("A member with this phone number is already registered.");
   }
 
-  return addCustomer({ name, phone, email, username, password });
+  const customer = await addCustomer({
+    name,
+    phone,
+    email,
+    username,
+    password,
+  });
+  return awardRegistrationBonus(customer.id);
+}
+
+async function awardRegistrationBonus(customerId: string): Promise<Customer> {
+  const bonusPoints = loyaltyConfig.registrationBonusPoints;
+  if (bonusPoints <= 0) {
+    const customer = await getCustomerById(customerId);
+    if (!customer) throw new Error("Customer not found");
+    return customer;
+  }
+
+  const customer = await getCustomerRow(customerId);
+  if (!customer) throw new Error("Customer not found");
+
+  const {
+    consecutivePointsEarned,
+    vouchersEarned,
+    freeDrinkVouchersEarned,
+    pointsReset,
+    cyclesCompleted,
+  } = applyStreakPointsEarned(
+    Number(customer.consecutive_points_earned),
+    bonusPoints
+  );
+
+  const newBalance = Math.max(
+    0,
+    Number(customer.points) + bonusPoints - pointsReset
+  );
+  const newTotalPointsEarned =
+    Number(customer.total_points_earned) + bonusPoints;
+  const streakResetPoints =
+    pointsReset > 0
+      ? Number(customer.points) + bonusPoints - newBalance
+      : 0;
+  const streakResetReason =
+    cyclesCompleted === 1
+      ? loyaltyConfig.streakResetReason
+      : `${loyaltyConfig.streakResetReason} (${cyclesCompleted} cycles)`;
+
+  const transactionId = generateId("txn");
+  const sql = getSql();
+  const queries = [
+    sql`
+      UPDATE customers
+      SET
+        points = ${newBalance},
+        total_points_earned = ${newTotalPointsEarned},
+        consecutive_points_earned = ${consecutivePointsEarned},
+        vouchers_available = vouchers_available + ${vouchersEarned},
+        free_drink_vouchers_available = free_drink_vouchers_available + ${freeDrinkVouchersEarned},
+        total_vouchers_earned = total_vouchers_earned + ${vouchersEarned},
+        total_free_drink_vouchers_earned = total_free_drink_vouchers_earned + ${freeDrinkVouchersEarned}
+      WHERE id = ${customerId}
+    `,
+    sql`
+      INSERT INTO transactions (id, customer_id, type, points, reason)
+      VALUES (
+        ${transactionId},
+        ${customerId},
+        'earn',
+        ${bonusPoints},
+        ${loyaltyConfig.registrationBonusReason}
+      )
+    `,
+  ];
+
+  for (let i = 0; i < vouchersEarned; i++) {
+    queries.push(
+      sql`
+        INSERT INTO transactions (id, customer_id, type, points, reason)
+        VALUES (
+          ${generateId("txn")},
+          ${customerId},
+          'voucher_earn',
+          0,
+          ${loyaltyConfig.voucher.earnReason}
+        )
+      `
+    );
+  }
+
+  for (let i = 0; i < freeDrinkVouchersEarned; i++) {
+    queries.push(
+      sql`
+        INSERT INTO transactions (id, customer_id, type, points, reason)
+        VALUES (
+          ${generateId("txn")},
+          ${customerId},
+          'free_drink_voucher_earn',
+          0,
+          ${loyaltyConfig.freeDrinkVoucher.earnReason}
+        )
+      `
+    );
+  }
+
+  if (streakResetPoints > 0) {
+    queries.push(
+      sql`
+        INSERT INTO transactions (id, customer_id, type, points, reason)
+        VALUES (
+          ${generateId("txn")},
+          ${customerId},
+          'redeem',
+          ${streakResetPoints},
+          ${streakResetReason}
+        )
+      `
+    );
+  }
+
+  await sql.transaction(queries);
+
+  const updated = await getCustomerById(customerId);
+  if (!updated) throw new Error("Customer not found");
+  return updated;
 }
 
 export async function updateCustomer(
@@ -837,6 +990,16 @@ export async function redeemFreeDrinkVoucher(
 export async function clearTransactionHistory(): Promise<void> {
   const sql = getSql();
   await sql`DELETE FROM transactions`;
+}
+
+export async function deleteTransaction(transactionId: string): Promise<void> {
+  const sql = getSql();
+  const rows = await sql`
+    DELETE FROM transactions WHERE id = ${transactionId} RETURNING id
+  `;
+  if (rows.length === 0) {
+    throw new Error("Transaction not found.");
+  }
 }
 
 export async function getTransactionsForCustomer(
