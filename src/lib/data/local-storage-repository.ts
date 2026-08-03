@@ -22,6 +22,7 @@ import {
   normalizeContact,
   normalizeCustomer,
 } from "./loyalty-calculations";
+import { isNonMemberCustomer } from "./non-member";
 
 function normalizeData(data: LoyaltyData): LoyaltyData {
   return {
@@ -172,10 +173,15 @@ export class LocalStorageLoyaltyRepository implements LoyaltyRepository {
       throw new Error("Enter a valid number of coffee drinks.");
     }
 
-    const points = calculatePointsFromDrinks(drinkCount);
+    const points = isNonMemberCustomer(input.customerId)
+      ? 0
+      : calculatePointsFromDrinks(drinkCount);
     const notes = input.notes?.trim();
     const drinkSummary = formatDrinkCount(drinkCount);
-    const reason = notes ? `${drinkSummary} — ${notes}` : drinkSummary;
+    let reason = notes ? `${drinkSummary} — ${notes}` : drinkSummary;
+    if (isNonMemberCustomer(input.customerId)) {
+      reason = `${reason} — Non-member (no loyalty)`;
+    }
 
     const transaction: Transaction = {
       id: generateId("txn"),

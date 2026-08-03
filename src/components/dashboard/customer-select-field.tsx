@@ -13,6 +13,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { Customer } from "@/types";
+import {
+  NON_MEMBER_CUSTOMER_ID,
+  isNonMemberCustomer,
+} from "@/lib/data/non-member";
 
 interface CustomerSelectFieldProps {
   customerId: string;
@@ -21,6 +25,7 @@ interface CustomerSelectFieldProps {
   onScanError?: (message: string) => void;
   label?: string;
   placeholder?: string;
+  disabled?: boolean;
 }
 
 export function CustomerSelectField({
@@ -30,17 +35,31 @@ export function CustomerSelectField({
   onScanError,
   label = "Customer",
   placeholder = "Select customer...",
+  disabled = false,
 }: CustomerSelectFieldProps) {
   const [scannerOpen, setScannerOpen] = useState(false);
-  const selectedCustomer = customers.find((c) => c.id === customerId);
+  const sortedCustomers = [...customers].sort((a, b) => {
+    if (a.id === NON_MEMBER_CUSTOMER_ID) return -1;
+    if (b.id === NON_MEMBER_CUSTOMER_ID) return 1;
+    return a.name.localeCompare(b.name);
+  });
+  const selectedCustomer = sortedCustomers.find((c) => c.id === customerId);
 
   function handleScan(scannedId: string) {
+    if (disabled) return;
     const match = customers.find((c) => c.id === scannedId);
     if (!match) {
       onScanError?.("Customer not found. Add them to the directory first.");
       return;
     }
     onCustomerIdChange(scannedId);
+  }
+
+  function customerLabel(customer: Customer) {
+    if (isNonMemberCustomer(customer.id)) {
+      return `${customer.name} (non-member)`;
+    }
+    return `${customer.name} (${customer.points} pts)`;
   }
 
   return (
@@ -51,16 +70,25 @@ export function CustomerSelectField({
           <Select
             value={customerId}
             onValueChange={(value) => onCustomerIdChange(value ?? "")}
+            disabled={disabled}
           >
             <SelectTrigger className="w-full flex-1">
               <SelectValue placeholder={placeholder}>
-                {selectedCustomer?.name}
+                {selectedCustomer
+                  ? isNonMemberCustomer(selectedCustomer.id)
+                    ? `${selectedCustomer.name} (non-member)`
+                    : selectedCustomer.name
+                  : undefined}
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
-              {customers.map((customer) => (
-                <SelectItem key={customer.id} value={customer.id} label={customer.name}>
-                  {customer.name} ({customer.points} pts)
+              {sortedCustomers.map((customer) => (
+                <SelectItem
+                  key={customer.id}
+                  value={customer.id}
+                  label={customerLabel(customer)}
+                >
+                  {customerLabel(customer)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -70,6 +98,7 @@ export function CustomerSelectField({
             variant="outline"
             size="icon"
             aria-label="Scan customer QR code"
+            disabled={disabled}
             onClick={() => setScannerOpen(true)}
           >
             <ScanLine className="size-4" />

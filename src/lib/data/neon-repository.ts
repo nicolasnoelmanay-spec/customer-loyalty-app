@@ -21,6 +21,8 @@ import type {
   Transaction,
   UpdateCustomerInput,
   UpdateCustomerProfileInput,
+  UpdatePendingOrderInput,
+  VoucherApplyOption,
 } from "@/types";
 import { generateId, normalizeContact } from "./loyalty-calculations";
 import {
@@ -55,15 +57,52 @@ import {
   type CompletedOrderRecord,
   type PendingOrderRecord,
 } from "./pending-order-utils";
+import {
+  isNonMemberCustomer,
+  NON_MEMBER_CUSTOMER_ID,
+  NON_MEMBER_CUSTOMER_NAME,
+} from "./non-member";
+
+async function ensureNonMemberCustomer(): Promise<void> {
+  const existing = await getCustomerRow(NON_MEMBER_CUSTOMER_ID);
+  if (existing) return;
+
+  const sql = getSql();
+  await sql`
+    INSERT INTO customers (
+      id, name, phone, email, username, password_hash, points, total_points_earned,
+      consecutive_points_earned, vouchers_available,
+      free_drink_vouchers_available, total_vouchers_earned,
+      total_free_drink_vouchers_earned, created_at
+    )
+    VALUES (
+      ${NON_MEMBER_CUSTOMER_ID},
+      ${NON_MEMBER_CUSTOMER_NAME},
+      ${"N/A"},
+      ${"nonmember@coffeesentials.local"},
+      ${"customer2"},
+      ${null},
+      0, 0, 0, 0, 0, 0, 0,
+      ${"2026-01-01T00:00:00.000Z"}
+    )
+    ON CONFLICT (id) DO NOTHING
+  `;
+}
 
 async function fetchCustomers(): Promise<Customer[]> {
+  await ensureNonMemberCustomer();
   const sql = getSql();
   const rows = await sql`
     SELECT *
     FROM customers
     ORDER BY name ASC
   `;
-  return (rows as CustomerRow[]).map(mapCustomer);
+  const customers = (rows as CustomerRow[]).map(mapCustomer);
+  return customers.sort((a, b) => {
+    if (a.id === NON_MEMBER_CUSTOMER_ID) return -1;
+    if (b.id === NON_MEMBER_CUSTOMER_ID) return 1;
+    return a.name.localeCompare(b.name);
+  });
 }
 
 async function fetchTransactions(): Promise<Transaction[]> {
@@ -510,6 +549,11 @@ export async function logPurchase(
     reason = notes ? `${drinkSummary} — ${notes}` : drinkSummary;
   }
 
+  if (isNonMemberCustomer(input.customerId)) {
+    points = 0;
+    reason = `${reason} — Non-member (no loyalty)`;
+  }
+
   const transactionId = generateId("txn");
   const newTotalPointsEarned = Number(customer.total_points_earned) + points;
   const {
@@ -909,6 +953,40 @@ export async function getPendingOrders(): Promise<PendingOrder[]> {
   );
 }
 
+export async function getPendingOrderById(
+  orderId: string
+): Promise<PendingOrder | null> {
+  const sql = getSql();
+  const [rows, products] = await Promise.all([
+    sql`
+      SELECT
+        po.id,
+        po.customer_id,
+        c.name AS customer_name,
+        po.notes,
+        po.voucher_to_apply,
+        po.items,
+        po.created_at
+      FROM pending_orders po
+      INNER JOIN customers c ON c.id = po.customer_id
+      WHERE po.id = ${orderId}
+      LIMIT 1
+    `,
+    getProducts(),
+  ]);
+
+  if (rows.length === 0) return null;
+
+  const row = rows[0] as PendingOrderRecord;
+  return enrichPendingOrder(
+    {
+      ...row,
+      items: parsePendingOrderItems(row.items),
+    },
+    products
+  );
+}
+
 export async function createPendingOrder(
   input: CreatePendingOrderInput
 ): Promise<PendingOrder> {
@@ -932,7 +1010,10 @@ export async function createPendingOrder(
     catalog
   );
 
-  const voucherToApply = input.voucherToApply ?? "none";
+  let voucherToApply = input.voucherToApply ?? "none";
+  if (isNonMemberCustomer(input.customerId)) {
+    voucherToApply = "none";
+  }
   if (voucherToApply === "voucher" && Number(customer.vouchers_available) <= 0) {
     throw new Error("No 50% off vouchers available for this customer.");
   }
@@ -962,10 +1043,72 @@ export async function createPendingOrder(
     )
   `;
 
-  const orders = await getPendingOrders();
-  const created = orders.find((order) => order.id === orderId);
+  const created = await getPendingOrderById(orderId);
   if (!created) throw new Error("Failed to create pending order.");
   return created;
+}
+
+export async function updatePendingOrder(
+  orderId: string,
+  input: UpdatePendingOrderInput
+): Promise<PendingOrder> {
+  const existing = await getPendingOrderById(orderId);
+  if (!existing) throw new Error("Pending order not found.");
+
+  const customer = await getCustomerRow(existing.customerId);
+  if (!customer) throw new Error("Customer not found.");
+
+  const selectedItems = input.items.filter((item) => item.quantity > 0);
+  if (selectedItems.length === 0) {
+    throw new Error("Add at least one product.");
+  }
+
+  for (const item of selectedItems) {
+    if (!Number.isInteger(item.quantity) || item.quantity <= 0) {
+      throw new Error("Invalid product quantity.");
+    }
+  }
+
+  const catalog = await getProducts();
+  const normalizedItems = await normalizePendingOrderItems(
+    selectedItems,
+    catalog
+  );
+
+  let voucherToApply = input.voucherToApply ?? existing.voucherToApply;
+  if (isNonMemberCustomer(existing.customerId)) {
+    voucherToApply = "none";
+  }
+  if (voucherToApply === "voucher" && Number(customer.vouchers_available) <= 0) {
+    throw new Error("No 50% off vouchers available for this customer.");
+  }
+  if (
+    voucherToApply === "free-drink-voucher" &&
+    Number(customer.free_drink_vouchers_available) <= 0
+  ) {
+    throw new Error("No free drink vouchers available for this customer.");
+  }
+
+  const notes =
+    typeof input.notes === "string" ? input.notes.trim() : existing.notes;
+
+  const sql = getSql();
+  const rows = await sql`
+    UPDATE pending_orders
+    SET
+      items = ${JSON.stringify(normalizedItems)}::jsonb,
+      notes = ${notes},
+      voucher_to_apply = ${voucherToApply}
+    WHERE id = ${orderId}
+    RETURNING id
+  `;
+  if (rows.length === 0) {
+    throw new Error("Pending order not found.");
+  }
+
+  const updated = await getPendingOrderById(orderId);
+  if (!updated) throw new Error("Failed to update pending order.");
+  return updated;
 }
 
 export async function deletePendingOrder(orderId: string): Promise<void> {
@@ -1084,7 +1227,10 @@ export async function completePendingOrder(orderId: string): Promise<Transaction
 
   const record = rows[0] as PendingOrderRecord;
   const items = parsePendingOrderItems(record.items);
-  const voucherToApply = record.voucher_to_apply as CreatePendingOrderInput["voucherToApply"];
+  let voucherToApply = record.voucher_to_apply as VoucherApplyOption;
+  if (isNonMemberCustomer(record.customer_id)) {
+    voucherToApply = "none";
+  }
 
   const transaction = await logPurchase({
     customerId: record.customer_id,
@@ -1098,7 +1244,11 @@ export async function completePendingOrder(orderId: string): Promise<Transaction
     await redeemFreeDrinkVoucher({ customerId: record.customer_id, count: 1 });
   }
 
-  await saveCompletedOrder(record, products, transaction.id);
+  await saveCompletedOrder(
+    { ...record, voucher_to_apply: voucherToApply },
+    products,
+    transaction.id
+  );
   await deletePendingOrder(orderId);
   return transaction;
 }

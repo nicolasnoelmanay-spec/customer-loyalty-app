@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { CheckCircle2, ClipboardList, Trash2 } from "lucide-react";
+import { CheckCircle2, ClipboardList, Plus, Trash2 } from "lucide-react";
 import { loyaltyConfig } from "@/config/loyalty";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -231,6 +231,13 @@ export function PendingOrdersContent() {
                     <Trash2 className="size-4" />
                     Remove
                   </Button>
+                  <Link
+                    href={`/products?pendingOrderId=${encodeURIComponent(order.id)}`}
+                    className={cn(buttonVariants({ variant: "outline" }))}
+                  >
+                    <Plus className="size-4" />
+                    Add items
+                  </Link>
                   <Button
                     type="button"
                     className="bg-emerald-600 hover:bg-emerald-700 text-white"

@@ -124,6 +124,12 @@ export interface CreatePendingOrderInput {
   voucherToApply?: VoucherApplyOption;
 }
 
+export interface UpdatePendingOrderInput {
+  items: PurchaseItemInput[];
+  notes?: string;
+  voucherToApply?: VoucherApplyOption;
+}
+
 export interface RedeemPointsInput {
   customerId: string;
   points: number;

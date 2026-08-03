@@ -137,6 +137,24 @@ const seedCustomer = {
   created_at: "2026-01-15T10:00:00.000Z",
 };
 
+/** Walk-in / non-member default — does not earn points or vouchers. */
+const seedNonMemberCustomer = {
+  id: "cust-customer2",
+  name: "customer2",
+  phone: "N/A",
+  email: "nonmember@coffeesentials.local",
+  username: "customer2",
+  password: null,
+  points: 0,
+  total_points_earned: 0,
+  consecutive_points_earned: 0,
+  vouchers_available: 0,
+  free_drink_vouchers_available: 0,
+  total_vouchers_earned: 0,
+  total_free_drink_vouchers_earned: 0,
+  created_at: "2026-01-01T00:00:00.000Z",
+};
+
 const rawSeedProducts = [
   { id: "prod-espresso", name: "Espresso", category: "drink", price: 50, points_earned: 0, description: "", sort_order: 0 },
   { id: "prod-matcha-espresso", name: "Matcha Espresso", category: "drink", price: 155, points_earned: 1, description: "", sort_order: 1 },
@@ -317,7 +335,8 @@ async function backfillCustomerCredentials() {
   const rows = await sql`
     SELECT id, email, username, password_hash
     FROM customers
-    WHERE username IS NULL OR password_hash IS NULL
+    WHERE (username IS NULL OR password_hash IS NULL)
+      AND id <> 'cust-customer2'
   `;
 
   for (const row of rows) {
@@ -416,6 +435,9 @@ if (existingCustomers[0].count > 0) {
     console.log("Seeded 1 default customer.");
   }
 }
+
+await migrateCustomers([seedNonMemberCustomer], []);
+console.log("Ensured non-member customer2 exists.");
 
 const tables = await sql`
   SELECT table_name

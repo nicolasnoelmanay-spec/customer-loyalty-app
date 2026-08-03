@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Coffee,
   Cookie,
@@ -52,11 +53,22 @@ import {
   resolveQuarterPounderOption,
 } from "@/lib/data/quarter-pounder-options";
 import { isDrinkCategory } from "@/lib/data/product-categories";
-import { apiCreatePendingOrder, fetchProducts } from "@/lib/api/loyalty-client";
+import { mergePurchaseItems } from "@/lib/data/pending-order-utils";
+import {
+  apiCreatePendingOrder,
+  apiUpdatePendingOrder,
+  fetchPendingOrders,
+  fetchProducts,
+} from "@/lib/api/loyalty-client";
 import { useLoyalty } from "@/hooks/use-loyalty";
 import { cn } from "@/lib/utils";
+import {
+  NON_MEMBER_CUSTOMER_ID,
+  isNonMemberCustomer,
+} from "@/lib/data/non-member";
 import type {
   DrinkTemperature,
+  PendingOrder,
   Product,
   ProductCategory,
   PurchaseItemInput,
@@ -71,11 +83,15 @@ function categoryIcon(category: ProductCategory) {
   return Cookie;
 }
 
-export function ProductsContent() {
+function ProductsContentInner() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const pendingOrderId = searchParams.get("pendingOrderId");
   const { customers } = useLoyalty();
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [customerId, setCustomerId] = useState("");
+  const [editingOrder, setEditingOrder] = useState<PendingOrder | null>(null);
+  const [customerId, setCustomerId] = useState(NON_MEMBER_CUSTOMER_ID);
   const [cart, setCart] = useState<Cart>({});
   const [notes, setNotes] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -106,6 +122,41 @@ export function ProductsContent() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (!pendingOrderId) {
+      setEditingOrder(null);
+      return;
+    }
+
+    let cancelled = false;
+    fetchPendingOrders()
+      .then((orders) => {
+        if (cancelled) return;
+        const order = orders.find((entry) => entry.id === pendingOrderId);
+        if (!order) {
+          setEditingOrder(null);
+          setError("Pending order not found. It may have been completed or removed.");
+          router.replace("/products");
+          return;
+        }
+        setEditingOrder(order);
+        setCustomerId(order.customerId);
+        setNotes(order.notes);
+        setVoucherToApply(order.voucherToApply);
+        setCart({});
+        setSuccess(null);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setError("Failed to load pending order.");
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [pendingOrderId, router]);
 
   const cartItems: PurchaseItemInput[] = useMemo(
     () =>
@@ -146,17 +197,29 @@ export function ProductsContent() {
     [cartItems, products]
   );
 
+  const isEditingPendingOrder = editingOrder !== null;
+  const isNonMemberCheckout = isNonMemberCustomer(customerId);
+  const effectiveVoucherToApply = isNonMemberCheckout ? "none" : voucherToApply;
+
   const checkoutTotal = useMemo(
-    () => calculateCheckoutTotal(totals.subtotal, cartProducts, voucherToApply),
-    [totals.subtotal, cartProducts, voucherToApply]
+    () =>
+      calculateCheckoutTotal(
+        totals.subtotal,
+        cartProducts,
+        effectiveVoucherToApply
+      ),
+    [totals.subtotal, cartProducts, effectiveVoucherToApply]
   );
 
   const selectedCustomer = customers.find((customer) => customer.id === customerId);
-  const hasFiftyOffVoucher = (selectedCustomer?.vouchersAvailable ?? 0) > 0;
+  const hasFiftyOffVoucher =
+    !isNonMemberCheckout && (selectedCustomer?.vouchersAvailable ?? 0) > 0;
   const hasFreeDrinkVoucher =
+    !isNonMemberCheckout &&
     (selectedCustomer?.freeDrinkVouchersAvailable ?? 0) > 0;
+  const displayPointsEarned = isNonMemberCheckout ? 0 : totals.pointsEarned;
   const streakPreview =
-    selectedCustomer && totals.pointsEarned > 0
+    selectedCustomer && !isNonMemberCheckout && totals.pointsEarned > 0
       ? applyStreakPointsEarned(
           selectedCustomer.consecutivePointsEarned,
           totals.pointsEarned
@@ -264,6 +327,7 @@ export function ProductsContent() {
   }
 
   function handleCustomerChange(nextCustomerId: string) {
+    if (isEditingPendingOrder) return;
     setCustomerId(nextCustomerId);
     setVoucherToApply("none");
   }
@@ -284,17 +348,39 @@ export function ProductsContent() {
 
     setIsSubmitting(true);
     try {
-      await apiCreatePendingOrder({
-        customerId,
-        items: cartItems,
-        notes: notes.trim() || undefined,
-        voucherToApply,
-      });
-
-      resetCheckout();
-      setSuccess("Added to pending orders.");
+      const effectiveVoucher = isNonMemberCustomer(customerId)
+        ? "none"
+        : voucherToApply;
+      if (editingOrder) {
+        const mergedItems = mergePurchaseItems(editingOrder.items, cartItems);
+        const updated = await apiUpdatePendingOrder(editingOrder.id, {
+          items: mergedItems,
+          notes: notes.trim() || undefined,
+          voucherToApply: effectiveVoucher,
+        });
+        setCart({});
+        setEditingOrder(updated);
+        setSuccess("Items added to pending order.");
+        router.replace("/products");
+      } else {
+        await apiCreatePendingOrder({
+          customerId,
+          items: cartItems,
+          notes: notes.trim() || undefined,
+          voucherToApply: effectiveVoucher,
+        });
+        resetCheckout();
+        setCustomerId(NON_MEMBER_CUSTOMER_ID);
+        setSuccess("Added to pending orders.");
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to add pending order.");
+      setError(
+        err instanceof Error
+          ? err.message
+          : isEditingPendingOrder
+            ? "Failed to update pending order."
+            : "Failed to add pending order."
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -506,9 +592,26 @@ export function ProductsContent() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Products</h1>
           <p className="text-muted-foreground">
-            Build an order of drinks, frappés, and snacks for {loyaltyConfig.programName}.
+            {isEditingPendingOrder
+              ? `Add more items to ${editingOrder.customerName}'s pending order.`
+              : `Build an order of drinks, frappés, and snacks for ${loyaltyConfig.programName}.`}
           </p>
         </div>
+
+        {isEditingPendingOrder && (
+          <div className="rounded-lg border border-emerald-600/40 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-200">
+            Adding items to{" "}
+            <span className="font-medium">{editingOrder.customerName}</span>
+            &apos;s pending order ({editingOrder.items.length} item
+            {editingOrder.items.length === 1 ? "" : "s"} already queued).{" "}
+            <Link
+              href="/pending-orders"
+              className="font-medium underline underline-offset-2"
+            >
+              Back to pending orders
+            </Link>
+          </div>
+        )}
 
         <Tabs defaultValue="all">
           <TabsList className="grid w-full grid-cols-4">
@@ -550,9 +653,10 @@ export function ProductsContent() {
               customers={customers}
               onCustomerIdChange={handleCustomerChange}
               onScanError={setError}
+              disabled={isEditingPendingOrder}
             />
 
-            {selectedCustomer && (
+            {selectedCustomer && !isNonMemberCheckout && (
               <div className="rounded-lg border bg-muted/30 px-3 py-3 text-sm space-y-2">
                 <p className="font-medium">Available vouchers</p>
                 <div className="flex flex-wrap gap-2">
@@ -714,12 +818,14 @@ export function ProductsContent() {
               <div className="flex justify-between border-t pt-2">
                 <span className="text-muted-foreground">Points to award</span>
                 <span className="font-medium text-emerald-600 dark:text-emerald-400">
-                  +{totals.pointsEarned}
+                  +{displayPointsEarned}
                 </span>
               </div>
             </div>
 
-            {selectedCustomer && totals.pointsEarned > 0 && streakPreview && (
+            {selectedCustomer &&
+              displayPointsEarned > 0 &&
+              streakPreview && (
               <div className="rounded-lg border bg-emerald-50/80 px-3 py-3 text-sm dark:bg-emerald-950/20 space-y-1">
                 <p className="flex items-center gap-2 font-medium text-emerald-700 dark:text-emerald-300">
                   <Sparkles className="size-4" />
@@ -771,14 +877,34 @@ export function ProductsContent() {
               disabled={isSubmitting || cartProducts.length === 0}
             >
               {isSubmitting
-                ? "Adding..."
+                ? isEditingPendingOrder
+                  ? "Updating..."
+                  : "Adding..."
                 : cartProducts.length > 0
-                  ? `Add to Pending Order · ${formatCurrency(checkoutTotal.total)}`
-                  : "Add to Pending Order"}
+                  ? isEditingPendingOrder
+                    ? `Add Items to Order · ${formatCurrency(checkoutTotal.total)}`
+                    : `Add to Pending Order · ${formatCurrency(checkoutTotal.total)}`
+                  : isEditingPendingOrder
+                    ? "Add Items to Order"
+                    : "Add to Pending Order"}
             </Button>
           </form>
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export function ProductsContent() {
+  return (
+    <Suspense
+      fallback={
+        <p className="py-12 text-center text-sm text-muted-foreground">
+          Loading products…
+        </p>
+      }
+    >
+      <ProductsContentInner />
+    </Suspense>
   );
 }

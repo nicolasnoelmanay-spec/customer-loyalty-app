@@ -2,6 +2,7 @@ import {
   calculateCheckoutTotal,
   calculatePurchaseTotals,
 } from "@/lib/data/purchase-calculations";
+import { isNonMemberCustomer } from "@/lib/data/non-member";
 import type {
   CompletedOrder,
   PendingOrder,
@@ -64,12 +65,45 @@ export function enrichCompletedOrder(
   };
 }
 
+function purchaseItemKey(item: PurchaseItemInput): string {
+  return [
+    item.productId,
+    item.temperature ?? "",
+    item.quarterPounderOption ?? "",
+  ].join(":");
+}
+
+export function mergePurchaseItems(
+  existing: PurchaseItemInput[],
+  additions: PurchaseItemInput[]
+): PurchaseItemInput[] {
+  const merged = new Map<string, PurchaseItemInput>();
+
+  for (const item of [...existing, ...additions]) {
+    if (item.quantity <= 0) continue;
+    const key = purchaseItemKey(item);
+    const current = merged.get(key);
+    if (current) {
+      merged.set(key, {
+        ...current,
+        quantity: current.quantity + item.quantity,
+      });
+      continue;
+    }
+    merged.set(key, { ...item });
+  }
+
+  return Array.from(merged.values());
+}
+
 export function enrichPendingOrder(
   record: PendingOrderRecord,
   products: Product[]
 ): PendingOrder {
   const items = record.items;
-  const voucherToApply = record.voucher_to_apply as VoucherApplyOption;
+  const voucherToApply = isNonMemberCustomer(record.customer_id)
+    ? "none"
+    : (record.voucher_to_apply as VoucherApplyOption);
   const cartProducts = cartProductsFromItems(items, products);
   const totals = calculatePurchaseTotals(items, products);
   const checkout = calculateCheckoutTotal(
@@ -77,6 +111,9 @@ export function enrichPendingOrder(
     cartProducts,
     voucherToApply
   );
+  const pointsEarned = isNonMemberCustomer(record.customer_id)
+    ? 0
+    : totals.pointsEarned;
 
   return {
     id: record.id,
@@ -88,7 +125,7 @@ export function enrichPendingOrder(
     subtotal: checkout.subtotal,
     discount: checkout.discount,
     total: checkout.total,
-    pointsEarned: totals.pointsEarned,
+    pointsEarned,
     createdAt: new Date(record.created_at).toISOString(),
   };
 }

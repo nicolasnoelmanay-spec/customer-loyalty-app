@@ -13,6 +13,7 @@ import type {
   RedeemVoucherInput,
   Transaction,
   UpdateCustomerInput,
+  UpdatePendingOrderInput,
 } from "@/types";
 
 async function parseJson<T>(response: Response): Promise<T> {
@@ -141,6 +142,19 @@ export async function apiCreatePendingOrder(
 ): Promise<PendingOrder> {
   const response = await fetch("/api/pending-orders", {
     method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  return parseJson(response);
+}
+
+export async function apiUpdatePendingOrder(
+  orderId: string,
+  input: UpdatePendingOrderInput
+): Promise<PendingOrder> {
+  const response = await fetch(`/api/pending-orders/${orderId}`, {
+    method: "PATCH",
     credentials: "include",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
