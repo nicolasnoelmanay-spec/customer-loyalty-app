@@ -5,6 +5,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -59,6 +60,16 @@ interface LoyaltyContextValue {
 
 const LoyaltyContext = createContext<LoyaltyContextValue | null>(null);
 
+const FULL_PAGE_REFRESH_MS = 15 * 60 * 1000;
+const NEW_CUSTOMER_POLL_MS = 30 * 1000;
+
+function customerIdsFingerprint(customers: Customer[]): string {
+  return customers
+    .map((customer) => customer.id)
+    .sort()
+    .join(",");
+}
+
 function notReady(): never {
   throw new Error("Loyalty data is not loaded yet.");
 }
@@ -68,6 +79,8 @@ export function LoyaltyProvider({ children }: { children: ReactNode }) {
   const [isReady, setIsReady] = useState(false);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const customersRef = useRef(customers);
+  customersRef.current = customers;
 
   const refresh = useCallback(async () => {
     if (!isAuthenticated) {
@@ -112,6 +125,42 @@ export function LoyaltyProvider({ children }: { children: ReactNode }) {
 
     return () => {
       cancelled = true;
+    };
+  }, [authReady, isAuthenticated]);
+
+  useEffect(() => {
+    if (!authReady || !isAuthenticated) return;
+
+    let cancelled = false;
+
+    const pollForNewCustomers = async () => {
+      try {
+        const data = await fetchLoyaltyData();
+        if (cancelled) return;
+
+        const previousFingerprint = customerIdsFingerprint(customersRef.current);
+        const nextFingerprint = customerIdsFingerprint(data.customers);
+        if (previousFingerprint === nextFingerprint) return;
+
+        setCustomers(data.customers);
+        setTransactions(data.transactions);
+      } catch {
+        // Keep showing the last successful load on transient poll failures.
+      }
+    };
+
+    const customerPollId = window.setInterval(
+      pollForNewCustomers,
+      NEW_CUSTOMER_POLL_MS
+    );
+    const pageRefreshId = window.setInterval(() => {
+      window.location.reload();
+    }, FULL_PAGE_REFRESH_MS);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(customerPollId);
+      window.clearInterval(pageRefreshId);
     };
   }, [authReady, isAuthenticated]);
 
