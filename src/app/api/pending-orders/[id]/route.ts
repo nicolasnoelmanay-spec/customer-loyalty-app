@@ -6,11 +6,12 @@ import {
 } from "@/lib/api/route-utils";
 import { isValidDrinkTemperature } from "@/lib/data/drink-temperature";
 import { isValidQuarterPounderOption } from "@/lib/data/quarter-pounder-options";
+import { normalizePaymentType } from "@/lib/data/pending-order-utils";
 import {
   deletePendingOrder,
   updatePendingOrder,
 } from "@/lib/data/neon-repository";
-import type { VoucherApplyOption } from "@/types";
+import type { PaymentType, VoucherApplyOption } from "@/types";
 
 const voucherOptions = new Set<VoucherApplyOption>([
   "none",
@@ -18,8 +19,14 @@ const voucherOptions = new Set<VoucherApplyOption>([
   "free-drink-voucher",
 ]);
 
+const paymentTypes = new Set<PaymentType>(["cash", "gcash"]);
+
 function isValidVoucherApplyOption(value: unknown): value is VoucherApplyOption {
   return typeof value === "string" && voucherOptions.has(value as VoucherApplyOption);
+}
+
+function isValidPaymentType(value: unknown): value is PaymentType {
+  return typeof value === "string" && paymentTypes.has(value as PaymentType);
 }
 
 interface RouteParams {
@@ -70,10 +77,19 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       return jsonError("Invalid voucher selection.", 400);
     }
 
+    let paymentType: PaymentType | undefined;
+    if (body.paymentType !== undefined) {
+      if (!isValidPaymentType(body.paymentType)) {
+        return jsonError("Payment type must be Cash or GCash.", 400);
+      }
+      paymentType = normalizePaymentType(body.paymentType);
+    }
+
     const order = await updatePendingOrder(id, {
       items,
       notes: typeof body.notes === "string" ? body.notes.trim() : undefined,
       voucherToApply,
+      paymentType,
     });
 
     return NextResponse.json(order);

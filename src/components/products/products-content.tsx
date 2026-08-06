@@ -68,6 +68,7 @@ import {
 } from "@/lib/data/non-member";
 import type {
   DrinkTemperature,
+  PaymentType,
   PendingOrder,
   Product,
   ProductCategory,
@@ -98,6 +99,7 @@ function ProductsContentInner() {
   const [success, setSuccess] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [voucherToApply, setVoucherToApply] = useState<VoucherApplyOption>("none");
+  const [paymentType, setPaymentType] = useState<PaymentType>("cash");
   const [drinkTemperature, setDrinkTemperature] = useState<
     Record<string, DrinkTemperature>
   >({});
@@ -144,6 +146,7 @@ function ProductsContentInner() {
         setCustomerId(order.customerId);
         setNotes(order.notes);
         setVoucherToApply(order.voucherToApply);
+        setPaymentType(order.paymentType);
         setCart({});
         setSuccess(null);
       })
@@ -324,6 +327,17 @@ function ProductsContentInner() {
     setNotes("");
     setError(null);
     setVoucherToApply("none");
+    setPaymentType("cash");
+  }
+
+  function handleNewTransaction() {
+    resetCheckout();
+    setSuccess(null);
+    setEditingOrder(null);
+    setCustomerId(NON_MEMBER_CUSTOMER_ID);
+    if (pendingOrderId) {
+      router.replace("/products");
+    }
   }
 
   function handleCustomerChange(nextCustomerId: string) {
@@ -357,6 +371,7 @@ function ProductsContentInner() {
           items: mergedItems,
           notes: notes.trim() || undefined,
           voucherToApply: effectiveVoucher,
+          paymentType,
         });
         setCart({});
         setEditingOrder(updated);
@@ -368,6 +383,7 @@ function ProductsContentInner() {
           items: cartItems,
           notes: notes.trim() || undefined,
           voucherToApply: effectiveVoucher,
+          paymentType,
         });
         resetCheckout();
         setCustomerId(NON_MEMBER_CUSTOMER_ID);
@@ -852,6 +868,36 @@ function ProductsContentInner() {
             )}
 
             <div className="grid gap-2">
+              <Label>Payment type</Label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPaymentType("cash")}
+                  className={cn(
+                    "rounded-lg border px-3 py-2 text-sm font-medium transition-colors",
+                    paymentType === "cash"
+                      ? "border-emerald-600 bg-emerald-50 dark:bg-emerald-950/40"
+                      : "border-border hover:bg-muted/50"
+                  )}
+                >
+                  Cash
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPaymentType("gcash")}
+                  className={cn(
+                    "rounded-lg border px-3 py-2 text-sm font-medium transition-colors",
+                    paymentType === "gcash"
+                      ? "border-sky-600 bg-sky-50 dark:bg-sky-950/40"
+                      : "border-border hover:bg-muted/50"
+                  )}
+                >
+                  GCash
+                </button>
+              </div>
+            </div>
+
+            <div className="grid gap-2">
               <Label htmlFor="order-notes">Notes (optional)</Label>
               <Textarea
                 id="order-notes"
@@ -888,6 +934,16 @@ function ProductsContentInner() {
                   : isEditingPendingOrder
                     ? "Add Items to Order"
                     : "Add to Pending Order"}
+            </Button>
+
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              disabled={isSubmitting}
+              onClick={handleNewTransaction}
+            >
+              New Order
             </Button>
           </form>
         </CardContent>

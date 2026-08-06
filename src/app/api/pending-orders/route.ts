@@ -6,8 +6,9 @@ import {
 } from "@/lib/api/route-utils";
 import { isValidDrinkTemperature } from "@/lib/data/drink-temperature";
 import { isValidQuarterPounderOption } from "@/lib/data/quarter-pounder-options";
+import { normalizePaymentType } from "@/lib/data/pending-order-utils";
 import { createPendingOrder, getPendingOrders } from "@/lib/data/neon-repository";
-import type { VoucherApplyOption } from "@/types";
+import type { PaymentType, VoucherApplyOption } from "@/types";
 
 const voucherOptions = new Set<VoucherApplyOption>([
   "none",
@@ -15,8 +16,14 @@ const voucherOptions = new Set<VoucherApplyOption>([
   "free-drink-voucher",
 ]);
 
+const paymentTypes = new Set<PaymentType>(["cash", "gcash"]);
+
 function isValidVoucherApplyOption(value: unknown): value is VoucherApplyOption {
   return typeof value === "string" && voucherOptions.has(value as VoucherApplyOption);
+}
+
+function isValidPaymentType(value: unknown): value is PaymentType {
+  return typeof value === "string" && paymentTypes.has(value as PaymentType);
 }
 
 export async function GET() {
@@ -76,11 +83,22 @@ export async function POST(request: Request) {
       return jsonError("Invalid voucher selection.", 400);
     }
 
+    const paymentType =
+      body.paymentType === undefined
+        ? "cash"
+        : isValidPaymentType(body.paymentType)
+          ? body.paymentType
+          : null;
+    if (paymentType === null) {
+      return jsonError("Payment type must be Cash or GCash.", 400);
+    }
+
     const order = await createPendingOrder({
       customerId,
       items,
       notes: typeof body.notes === "string" ? body.notes.trim() : undefined,
       voucherToApply,
+      paymentType: normalizePaymentType(paymentType),
     });
 
     return NextResponse.json(order, { status: 201 });

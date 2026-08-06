@@ -98,6 +98,8 @@ export interface PurchaseItemInput {
 
 export type VoucherApplyOption = "none" | "voucher" | "free-drink-voucher";
 
+export type PaymentType = "cash" | "gcash";
+
 export interface PendingOrder {
   id: string;
   customerId: string;
@@ -105,6 +107,7 @@ export interface PendingOrder {
   items: PurchaseItemInput[];
   notes: string;
   voucherToApply: VoucherApplyOption;
+  paymentType: PaymentType;
   subtotal: number;
   discount: number;
   total: number;
@@ -122,12 +125,14 @@ export interface CreatePendingOrderInput {
   items: PurchaseItemInput[];
   notes?: string;
   voucherToApply?: VoucherApplyOption;
+  paymentType?: PaymentType;
 }
 
 export interface UpdatePendingOrderInput {
   items: PurchaseItemInput[];
   notes?: string;
   voucherToApply?: VoucherApplyOption;
+  paymentType?: PaymentType;
 }
 
 export interface RedeemPointsInput {

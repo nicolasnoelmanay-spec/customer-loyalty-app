@@ -1,6 +1,7 @@
 import * as XLSX from "xlsx";
 import { loyaltyConfig } from "@/config/loyalty";
 import { formatQuarterPounderOptionLabel } from "@/lib/data/quarter-pounder-options";
+import { formatPaymentTypeLabel } from "@/lib/data/pending-order-utils";
 import { formatCurrency, getUnitPrice } from "@/lib/data/purchase-calculations";
 import { formatTransactionDate } from "@/lib/format-date";
 import type { CompletedOrder, Product, VoucherApplyOption } from "@/types";
@@ -98,6 +99,7 @@ export function exportCompletedOrdersToExcel(input: {
     Discount: order.discount,
     Total: order.total,
     "Points Earned": order.pointsEarned,
+    Payment: formatPaymentTypeLabel(order.paymentType),
     "Voucher Applied": voucherLabel(order.voucherToApply),
     Notes: order.notes,
   }));

@@ -24,6 +24,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatQuarterPounderOptionLabel } from "@/lib/data/quarter-pounder-options";
+import { formatPaymentTypeLabel } from "@/lib/data/pending-order-utils";
 import {
   calculateCheckoutTotal,
   calculateProductPointsEarned,
@@ -535,6 +536,10 @@ export function CompletedOrdersContent() {
                     Notes: {order.notes}
                   </p>
                 )}
+
+                <p className="text-sm text-muted-foreground">
+                  Payment: {formatPaymentTypeLabel(order.paymentType)}
+                </p>
 
                 {order.voucherToApply !== "none" && (
                   <p className="text-sm text-indigo-700 dark:text-indigo-300">

@@ -54,6 +54,7 @@ import {
 import {
   enrichPendingOrder,
   enrichCompletedOrder,
+  normalizePaymentType,
   type CompletedOrderRecord,
   type PendingOrderRecord,
 } from "./pending-order-utils";
@@ -62,6 +63,28 @@ import {
   NON_MEMBER_CUSTOMER_ID,
   NON_MEMBER_CUSTOMER_NAME,
 } from "./non-member";
+
+let paymentTypeColumnsReady: Promise<void> | null = null;
+
+async function ensurePaymentTypeColumns(): Promise<void> {
+  if (!paymentTypeColumnsReady) {
+    paymentTypeColumnsReady = (async () => {
+      const sql = getSql();
+      await sql`
+        ALTER TABLE pending_orders
+        ADD COLUMN IF NOT EXISTS payment_type TEXT NOT NULL DEFAULT 'cash'
+      `;
+      await sql`
+        ALTER TABLE completed_orders
+        ADD COLUMN IF NOT EXISTS payment_type TEXT NOT NULL DEFAULT 'cash'
+      `;
+    })().catch((error) => {
+      paymentTypeColumnsReady = null;
+      throw error;
+    });
+  }
+  await paymentTypeColumnsReady;
+}
 
 async function ensureNonMemberCustomer(): Promise<void> {
   const existing = await getCustomerRow(NON_MEMBER_CUSTOMER_ID);
@@ -1099,6 +1122,7 @@ async function normalizePendingOrderItems(
 }
 
 export async function getPendingOrders(): Promise<PendingOrder[]> {
+  await ensurePaymentTypeColumns();
   const sql = getSql();
   const [rows, products] = await Promise.all([
     sql`
@@ -1108,6 +1132,7 @@ export async function getPendingOrders(): Promise<PendingOrder[]> {
         c.name AS customer_name,
         po.notes,
         po.voucher_to_apply,
+        po.payment_type,
         po.items,
         po.created_at
       FROM pending_orders po
@@ -1131,6 +1156,7 @@ export async function getPendingOrders(): Promise<PendingOrder[]> {
 export async function getPendingOrderById(
   orderId: string
 ): Promise<PendingOrder | null> {
+  await ensurePaymentTypeColumns();
   const sql = getSql();
   const [rows, products] = await Promise.all([
     sql`
@@ -1140,6 +1166,7 @@ export async function getPendingOrderById(
         c.name AS customer_name,
         po.notes,
         po.voucher_to_apply,
+        po.payment_type,
         po.items,
         po.created_at
       FROM pending_orders po
@@ -1199,7 +1226,9 @@ export async function createPendingOrder(
     throw new Error("No free drink vouchers available for this customer.");
   }
 
+  const paymentType = normalizePaymentType(input.paymentType);
   const orderId = generateId("order");
+  await ensurePaymentTypeColumns();
   const sql = getSql();
   await sql`
     INSERT INTO pending_orders (
@@ -1207,6 +1236,7 @@ export async function createPendingOrder(
       customer_id,
       notes,
       voucher_to_apply,
+      payment_type,
       items
     )
     VALUES (
@@ -1214,6 +1244,7 @@ export async function createPendingOrder(
       ${input.customerId},
       ${input.notes?.trim() ?? ""},
       ${voucherToApply},
+      ${paymentType},
       ${JSON.stringify(normalizedItems)}::jsonb
     )
   `;
@@ -1266,14 +1297,20 @@ export async function updatePendingOrder(
 
   const notes =
     typeof input.notes === "string" ? input.notes.trim() : existing.notes;
+  const paymentType =
+    input.paymentType !== undefined
+      ? normalizePaymentType(input.paymentType)
+      : existing.paymentType;
 
+  await ensurePaymentTypeColumns();
   const sql = getSql();
   const rows = await sql`
     UPDATE pending_orders
     SET
       items = ${JSON.stringify(normalizedItems)}::jsonb,
       notes = ${notes},
-      voucher_to_apply = ${voucherToApply}
+      voucher_to_apply = ${voucherToApply},
+      payment_type = ${paymentType}
     WHERE id = ${orderId}
     RETURNING id
   `;
@@ -1297,6 +1334,7 @@ export async function deletePendingOrder(orderId: string): Promise<void> {
 }
 
 export async function getCompletedOrders(): Promise<CompletedOrder[]> {
+  await ensurePaymentTypeColumns();
   const sql = getSql();
   const rows = await sql`
     SELECT
@@ -1306,6 +1344,7 @@ export async function getCompletedOrders(): Promise<CompletedOrder[]> {
       co.transaction_id,
       co.notes,
       co.voucher_to_apply,
+      co.payment_type,
       co.items,
       co.subtotal,
       co.discount,
@@ -1345,6 +1384,7 @@ async function saveCompletedOrder(
 ): Promise<void> {
   const enriched = enrichPendingOrder(record, products);
   const sql = getSql();
+  await ensurePaymentTypeColumns();
   await sql`
     INSERT INTO completed_orders (
       id,
@@ -1352,6 +1392,7 @@ async function saveCompletedOrder(
       transaction_id,
       notes,
       voucher_to_apply,
+      payment_type,
       items,
       subtotal,
       discount,
@@ -1366,6 +1407,7 @@ async function saveCompletedOrder(
       ${transactionId},
       ${record.notes},
       ${record.voucher_to_apply},
+      ${normalizePaymentType(record.payment_type)},
       ${JSON.stringify(record.items)}::jsonb,
       ${enriched.subtotal},
       ${enriched.discount},
@@ -1378,6 +1420,7 @@ async function saveCompletedOrder(
 }
 
 export async function completePendingOrder(orderId: string): Promise<Transaction> {
+  await ensurePaymentTypeColumns();
   const sql = getSql();
   const [rows, products] = await Promise.all([
     sql`
@@ -1387,6 +1430,7 @@ export async function completePendingOrder(orderId: string): Promise<Transaction
         c.name AS customer_name,
         po.notes,
         po.voucher_to_apply,
+        po.payment_type,
         po.items,
         po.created_at
       FROM pending_orders po

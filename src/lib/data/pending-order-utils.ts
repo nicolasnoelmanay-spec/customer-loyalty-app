@@ -5,6 +5,7 @@ import {
 import { isNonMemberCustomer } from "@/lib/data/non-member";
 import type {
   CompletedOrder,
+  PaymentType,
   PendingOrder,
   Product,
   PurchaseItemInput,
@@ -17,6 +18,7 @@ export interface PendingOrderRecord {
   customer_name: string;
   notes: string;
   voucher_to_apply: string;
+  payment_type: string;
   items: PurchaseItemInput[];
   created_at: Date | string;
 }
@@ -45,6 +47,14 @@ export interface CompletedOrderRecord extends PendingOrderRecord {
   completed_at: Date | string;
 }
 
+export function normalizePaymentType(value: unknown): PaymentType {
+  return value === "gcash" ? "gcash" : "cash";
+}
+
+export function formatPaymentTypeLabel(paymentType: PaymentType): string {
+  return paymentType === "gcash" ? "GCash" : "Cash";
+}
+
 export function enrichCompletedOrder(
   record: CompletedOrderRecord
 ): CompletedOrder {
@@ -55,6 +65,7 @@ export function enrichCompletedOrder(
     items: record.items,
     notes: record.notes,
     voucherToApply: record.voucher_to_apply as VoucherApplyOption,
+    paymentType: normalizePaymentType(record.payment_type),
     subtotal: Number(record.subtotal),
     discount: Number(record.discount),
     total: Number(record.total),
@@ -122,6 +133,7 @@ export function enrichPendingOrder(
     items,
     notes: record.notes,
     voucherToApply,
+    paymentType: normalizePaymentType(record.payment_type),
     subtotal: checkout.subtotal,
     discount: checkout.discount,
     total: checkout.total,

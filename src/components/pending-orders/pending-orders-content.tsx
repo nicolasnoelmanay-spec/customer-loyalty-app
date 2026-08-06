@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/card";
 import { formatQuarterPounderOptionLabel } from "@/lib/data/quarter-pounder-options";
 import { formatCurrency } from "@/lib/data/purchase-calculations";
+import { formatPaymentTypeLabel } from "@/lib/data/pending-order-utils";
 import {
   apiCompletePendingOrder,
   apiDeletePendingOrder,
@@ -211,6 +212,10 @@ export function PendingOrdersContent() {
                     Notes: {order.notes}
                   </p>
                 )}
+
+                <p className="text-sm text-muted-foreground">
+                  Payment: {formatPaymentTypeLabel(order.paymentType)}
+                </p>
 
                 {order.voucherToApply !== "none" && (
                   <p className="text-sm text-indigo-700 dark:text-indigo-300">

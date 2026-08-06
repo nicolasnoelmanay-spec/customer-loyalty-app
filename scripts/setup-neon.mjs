@@ -96,6 +96,7 @@ CREATE TABLE IF NOT EXISTS pending_orders (
   customer_id TEXT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
   notes TEXT NOT NULL DEFAULT '',
   voucher_to_apply TEXT NOT NULL DEFAULT 'none',
+  payment_type TEXT NOT NULL DEFAULT 'cash',
   items JSONB NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -108,6 +109,7 @@ CREATE TABLE IF NOT EXISTS completed_orders (
   transaction_id TEXT REFERENCES transactions(id) ON DELETE SET NULL,
   notes TEXT NOT NULL DEFAULT '',
   voucher_to_apply TEXT NOT NULL DEFAULT 'none',
+  payment_type TEXT NOT NULL DEFAULT 'cash',
   items JSONB NOT NULL,
   subtotal INTEGER NOT NULL,
   discount INTEGER NOT NULL,
@@ -402,6 +404,12 @@ for (const statement of SCHEMA.split(";").map((s) => s.trim()).filter(Boolean)) 
 }
 
 await sql.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS iced_price INTEGER`);
+await sql.query(
+  `ALTER TABLE pending_orders ADD COLUMN IF NOT EXISTS payment_type TEXT NOT NULL DEFAULT 'cash'`
+);
+await sql.query(
+  `ALTER TABLE completed_orders ADD COLUMN IF NOT EXISTS payment_type TEXT NOT NULL DEFAULT 'cash'`
+);
 
 await migrateCustomerAuthColumns();
 await backfillCustomerCredentials();

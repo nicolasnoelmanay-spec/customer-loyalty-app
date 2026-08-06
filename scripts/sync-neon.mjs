@@ -141,6 +141,7 @@ CREATE TABLE IF NOT EXISTS pending_orders (
   customer_id TEXT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
   notes TEXT NOT NULL DEFAULT '',
   voucher_to_apply TEXT NOT NULL DEFAULT 'none',
+  payment_type TEXT NOT NULL DEFAULT 'cash',
   items JSONB NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -153,6 +154,7 @@ CREATE TABLE IF NOT EXISTS completed_orders (
   transaction_id TEXT REFERENCES transactions(id) ON DELETE SET NULL,
   notes TEXT NOT NULL DEFAULT '',
   voucher_to_apply TEXT NOT NULL DEFAULT 'none',
+  payment_type TEXT NOT NULL DEFAULT 'cash',
   items JSONB NOT NULL,
   subtotal INTEGER NOT NULL,
   discount INTEGER NOT NULL,
@@ -169,6 +171,8 @@ const MIGRATIONS = [
   `ALTER TABLE customers ADD COLUMN IF NOT EXISTS username TEXT UNIQUE`,
   `ALTER TABLE customers ADD COLUMN IF NOT EXISTS password_hash TEXT`,
   `ALTER TABLE products ADD COLUMN IF NOT EXISTS iced_price INTEGER`,
+  `ALTER TABLE pending_orders ADD COLUMN IF NOT EXISTS payment_type TEXT NOT NULL DEFAULT 'cash'`,
+  `ALTER TABLE completed_orders ADD COLUMN IF NOT EXISTS payment_type TEXT NOT NULL DEFAULT 'cash'`,
 ];
 
 function endpointHint(url) {
@@ -275,11 +279,11 @@ for (const row of transactions) {
 for (const row of pendingOrders) {
   await target`
     INSERT INTO pending_orders (
-      id, customer_id, notes, voucher_to_apply, items, created_at
+      id, customer_id, notes, voucher_to_apply, payment_type, items, created_at
     )
     VALUES (
       ${row.id}, ${row.customer_id}, ${row.notes}, ${row.voucher_to_apply},
-      ${row.items}, ${row.created_at}
+      ${row.payment_type ?? "cash"}, ${row.items}, ${row.created_at}
     )
   `;
 }
@@ -287,12 +291,12 @@ for (const row of pendingOrders) {
 for (const row of completedOrders) {
   await target`
     INSERT INTO completed_orders (
-      id, customer_id, transaction_id, notes, voucher_to_apply, items, subtotal,
+      id, customer_id, transaction_id, notes, voucher_to_apply, payment_type, items, subtotal,
       discount, total, points_earned, created_at, completed_at
     )
     VALUES (
       ${row.id}, ${row.customer_id}, ${row.transaction_id}, ${row.notes},
-      ${row.voucher_to_apply}, ${row.items}, ${row.subtotal}, ${row.discount},
+      ${row.voucher_to_apply}, ${row.payment_type ?? "cash"}, ${row.items}, ${row.subtotal}, ${row.discount},
       ${row.total}, ${row.points_earned}, ${row.created_at}, ${row.completed_at}
     )
   `;
