@@ -81,6 +81,8 @@ function computeOrderCheckout(order: CompletedOrder, products: Product[]) {
 function computeOrderStats(orders: CompletedOrder[]) {
   const customerIds = new Set<string>();
   let totalRevenue = 0;
+  let cashRevenue = 0;
+  let gcashRevenue = 0;
   let totalDiscount = 0;
   let totalPoints = 0;
   let itemsSold = 0;
@@ -89,6 +91,11 @@ function computeOrderStats(orders: CompletedOrder[]) {
   for (const order of orders) {
     customerIds.add(order.customerId);
     totalRevenue += order.total;
+    if (order.paymentType === "gcash") {
+      gcashRevenue += order.total;
+    } else {
+      cashRevenue += order.total;
+    }
     totalDiscount += order.discount;
     totalPoints += order.pointsEarned;
     itemsSold += order.items.reduce((sum, item) => sum + item.quantity, 0);
@@ -99,6 +106,8 @@ function computeOrderStats(orders: CompletedOrder[]) {
     orderCount: orders.length,
     customerCount: customerIds.size,
     totalRevenue,
+    cashRevenue,
+    gcashRevenue,
     totalDiscount,
     totalPoints,
     itemsSold,
@@ -362,8 +371,21 @@ export function CompletedOrdersContent() {
                   {formatCurrency(stats.totalRevenue)}
                 </CardTitle>
               </CardHeader>
-              <CardContent className="text-sm text-muted-foreground">
-                Avg {formatCurrency(stats.averageOrder)} per order
+              <CardContent>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <p className="text-muted-foreground">Cash</p>
+                    <p className="font-medium tabular-nums">
+                      {formatCurrency(stats.cashRevenue)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">GCash</p>
+                    <p className="font-medium tabular-nums">
+                      {formatCurrency(stats.gcashRevenue)}
+                    </p>
+                  </div>
+                </div>
               </CardContent>
             </Card>
             <Card>
@@ -408,7 +430,9 @@ export function CompletedOrdersContent() {
                 {stats.orderCount} completed order{stats.orderCount !== 1 ? "s" : ""}{" "}
                 {periodLabel} from {stats.customerCount} customer
                 {stats.customerCount !== 1 ? "s" : ""} ·{" "}
-                {formatCurrency(stats.totalRevenue)} gross revenue ·{" "}
+                {formatCurrency(stats.totalRevenue)} gross revenue (
+                Cash {formatCurrency(stats.cashRevenue)}, GCash{" "}
+                {formatCurrency(stats.gcashRevenue)}) ·{" "}
                 {formatCurrency(stats.totalDiscount)} in voucher discounts ·{" "}
                 {stats.totalPoints.toLocaleString()} points issued
               </CardDescription>

@@ -81,6 +81,8 @@ export function exportCompletedOrdersToExcel(input: {
     orderCount: number;
     customerCount: number;
     totalRevenue: number;
+    cashRevenue: number;
+    gcashRevenue: number;
     totalDiscount: number;
     totalPoints: number;
     itemsSold: number;
@@ -111,6 +113,8 @@ export function exportCompletedOrdersToExcel(input: {
     { Metric: "Unique Customers", Value: stats.customerCount },
     { Metric: "Items Sold", Value: stats.itemsSold },
     { Metric: "Total Revenue (PHP)", Value: stats.totalRevenue },
+    { Metric: "Cash Revenue (PHP)", Value: stats.cashRevenue },
+    { Metric: "GCash Revenue (PHP)", Value: stats.gcashRevenue },
     { Metric: "Average Order (PHP)", Value: stats.averageOrder },
     { Metric: "Voucher Savings (PHP)", Value: stats.totalDiscount },
     { Metric: "Orders With Voucher", Value: stats.voucherOrders },
