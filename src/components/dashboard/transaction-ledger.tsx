@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { ArrowDownLeft, ArrowUpRight, Coffee, History, Ticket, Trash2 } from "lucide-react";
 import { formatTransactionDate } from "@/lib/format-date";
 import { usePagination } from "@/hooks/use-pagination";
@@ -21,6 +21,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -31,7 +39,10 @@ import {
 } from "@/components/ui/table";
 import { ListPagination } from "@/components/ui/list-pagination";
 import { useLoyalty } from "@/hooks/use-loyalty";
+import { isNonMemberCustomer } from "@/lib/data/non-member";
 import type { Transaction } from "@/types";
+
+const ALL_CUSTOMERS = "all";
 
 function TransactionBadge({ txn }: { txn: Transaction }) {
   if (txn.type === "earn") {
@@ -128,15 +139,34 @@ function TransactionBadge({ txn }: { txn: Transaction }) {
 
 export function TransactionLedger() {
   const {
+    customers,
     transactions,
     getCustomerById,
     clearTransactionHistory,
     deleteTransaction,
   } = useLoyalty();
+  const [customerFilter, setCustomerFilter] = useState(ALL_CUSTOMERS);
   const [confirmClearOpen, setConfirmClearOpen] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<Transaction | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const filterCustomers = useMemo(
+    () =>
+      [...customers].sort((a, b) => {
+        if (isNonMemberCustomer(a.id) !== isNonMemberCustomer(b.id)) {
+          return isNonMemberCustomer(a.id) ? 1 : -1;
+        }
+        return a.name.localeCompare(b.name);
+      }),
+    [customers]
+  );
+
+  const filteredTransactions = useMemo(() => {
+    if (customerFilter === ALL_CUSTOMERS) return transactions;
+    return transactions.filter((txn) => txn.customerId === customerFilter);
+  }, [transactions, customerFilter]);
+
   const {
     paginatedItems,
     page,
@@ -144,7 +174,16 @@ export function TransactionLedger() {
     totalPages,
     pageSize,
     totalItems,
-  } = usePagination(transactions);
+  } = usePagination(
+    filteredTransactions,
+    undefined,
+    `${customerFilter}|${filteredTransactions.length}`
+  );
+
+  const selectedCustomerName =
+    customerFilter === ALL_CUSTOMERS
+      ? null
+      : getCustomerById(customerFilter)?.name ?? "Unknown";
 
   async function handleClear() {
     await clearTransactionHistory();
@@ -176,7 +215,11 @@ export function TransactionLedger() {
               <History className="size-5 text-emerald-600" />
               Transaction History
             </CardTitle>
-            <CardDescription>Recent point additions and redemptions</CardDescription>
+            <CardDescription>
+              {customerFilter === ALL_CUSTOMERS
+                ? "Recent point additions and redemptions"
+                : `Showing activity for ${selectedCustomerName}`}
+            </CardDescription>
           </div>
           {transactions.length > 0 && (
             <Button
@@ -195,7 +238,48 @@ export function TransactionLedger() {
             <TableHeader>
               <TableRow>
                 <TableHead>Date</TableHead>
-                <TableHead>Customer</TableHead>
+                <TableHead className="min-w-[10rem]">
+                  <Label htmlFor="transaction-customer-filter" className="sr-only">
+                    Filter by customer
+                  </Label>
+                  <Select
+                    value={customerFilter}
+                    onValueChange={(value) =>
+                      setCustomerFilter(value ?? ALL_CUSTOMERS)
+                    }
+                  >
+                    <SelectTrigger
+                      id="transaction-customer-filter"
+                      className="h-8 w-full min-w-[9rem] border-0 bg-transparent px-0 shadow-none hover:bg-transparent focus-visible:ring-0"
+                    >
+                      <SelectValue>
+                        {customerFilter === ALL_CUSTOMERS
+                          ? "Customer"
+                          : selectedCustomerName}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={ALL_CUSTOMERS} label="All customers">
+                        All customers
+                      </SelectItem>
+                      {filterCustomers.map((customer) => (
+                        <SelectItem
+                          key={customer.id}
+                          value={customer.id}
+                          label={
+                            isNonMemberCustomer(customer.id)
+                              ? `${customer.name} (non-member)`
+                              : customer.name
+                          }
+                        >
+                          {isNonMemberCustomer(customer.id)
+                            ? `${customer.name} (non-member)`
+                            : customer.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </TableHead>
                 <TableHead className="hidden sm:table-cell">Reason</TableHead>
                 <TableHead className="text-right">Activity</TableHead>
                 <TableHead className="w-12">
@@ -208,6 +292,12 @@ export function TransactionLedger() {
                 <TableRow>
                   <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
                     No transactions yet.
+                  </TableCell>
+                </TableRow>
+              ) : filteredTransactions.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
+                    No transactions for this customer.
                   </TableCell>
                 </TableRow>
               ) : (
