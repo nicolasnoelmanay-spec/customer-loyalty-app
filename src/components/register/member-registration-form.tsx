@@ -27,6 +27,7 @@ export function MemberRegistrationForm({
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [acceptedPrivacy, setAcceptedPrivacy] = useState(false);
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [registeredCustomer, setRegisteredCustomer] = useState<Customer | null>(
@@ -50,6 +51,11 @@ export function MemberRegistrationForm({
 
     if (password !== confirmPassword) {
       setError("Passwords do not match.");
+      return;
+    }
+
+    if (!acceptedPrivacy) {
+      setError("Please accept the Data Privacy Agreement to continue.");
       return;
     }
 
@@ -78,6 +84,7 @@ export function MemberRegistrationForm({
     setUsername("");
     setPassword("");
     setConfirmPassword("");
+    setAcceptedPrivacy(false);
     setError("");
   }
 
@@ -234,6 +241,28 @@ export function MemberRegistrationForm({
             onChange={(e) => setConfirmPassword(e.target.value)}
             autoComplete="new-password"
           />
+        </div>
+        <div className="flex items-start gap-3">
+          <input
+            id="member-privacy"
+            name="member-privacy"
+            type="checkbox"
+            checked={acceptedPrivacy}
+            onChange={(e) => setAcceptedPrivacy(e.target.checked)}
+            className="mt-1 size-4 shrink-0 rounded border border-input accent-emerald-600"
+          />
+          <Label htmlFor="member-privacy" className="text-sm font-normal leading-snug">
+            I have read and agree to the{" "}
+            <Link
+              href="/privacy"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-medium text-emerald-700 underline underline-offset-2 dark:text-emerald-400"
+            >
+              Data Privacy Agreement
+            </Link>
+            .
+          </Label>
         </div>
         {error && (
           <div className="space-y-2">
