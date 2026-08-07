@@ -135,6 +135,13 @@ export interface UpdatePendingOrderInput {
   paymentType?: PaymentType;
 }
 
+export interface UpdateCompletedOrderInput {
+  items: PurchaseItemInput[];
+  notes?: string;
+  voucherToApply?: VoucherApplyOption;
+  paymentType?: PaymentType;
+}
+
 export interface RedeemPointsInput {
   customerId: string;
   points: number;

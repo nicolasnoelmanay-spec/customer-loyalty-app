@@ -14,6 +14,7 @@ import type {
   Transaction,
   UpdateCustomerInput,
   UpdatePendingOrderInput,
+  UpdateCompletedOrderInput,
 } from "@/types";
 
 async function parseJson<T>(response: Response): Promise<T> {
@@ -127,6 +128,19 @@ export async function fetchCompletedOrders(): Promise<CompletedOrder[]> {
   });
   const data = await parseJson<{ orders: CompletedOrder[] }>(response);
   return data.orders;
+}
+
+export async function apiUpdateCompletedOrder(
+  orderId: string,
+  input: UpdateCompletedOrderInput
+): Promise<CompletedOrder> {
+  const response = await fetch(`/api/completed-orders/${orderId}`, {
+    method: "PATCH",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  return parseJson(response);
 }
 
 export async function fetchPendingOrders(): Promise<PendingOrder[]> {
@@ -269,14 +283,14 @@ export async function apiDeleteTransaction(transactionId: string): Promise<void>
 export async function apiLogin(
   username: string,
   password: string
-): Promise<void> {
+): Promise<{ username: string }> {
   const response = await fetch("/api/auth/login", {
     method: "POST",
     credentials: "include",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ username, password }),
   });
-  await parseJson(response);
+  return parseJson<{ ok: boolean; username: string }>(response);
 }
 
 export async function apiLogout(): Promise<void> {
@@ -287,10 +301,14 @@ export async function apiLogout(): Promise<void> {
   await parseJson(response);
 }
 
-export async function apiGetSession(): Promise<boolean> {
+export async function apiGetSession(): Promise<{
+  authenticated: boolean;
+  username: string | null;
+}> {
   const response = await fetch("/api/auth/session", {
     credentials: "include",
   });
-  const data = await parseJson<{ authenticated: boolean }>(response);
-  return data.authenticated;
+  return parseJson<{ authenticated: boolean; username: string | null }>(
+    response
+  );
 }

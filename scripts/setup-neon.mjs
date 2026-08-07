@@ -276,18 +276,29 @@ function readSqliteData(dbPath) {
 }
 
 async function ensureAdminStaff() {
-  const existing = await sql`SELECT id FROM staff WHERE username = 'admin'`;
-  if (existing.length > 0) {
-    console.log("Admin staff already exists.");
-    return;
-  }
-
   const passwordHash = await bcrypt.hash("12345", 10);
-  await sql`
-    INSERT INTO staff (id, username, password_hash, name)
-    VALUES ('staff-admin', 'admin', ${passwordHash}, 'Administrator')
-  `;
-  console.log("Created admin staff (username: admin, password: 12345).");
+  const admins = [
+    { id: "staff-admin", username: "admin", name: "Administrator" },
+    { id: "staff-admin2", username: "admin2", name: "Administrator 2" },
+  ];
+
+  for (const admin of admins) {
+    const existing = await sql`
+      SELECT id FROM staff WHERE username = ${admin.username}
+    `;
+    if (existing.length > 0) {
+      console.log(`Admin staff already exists (${admin.username}).`);
+      continue;
+    }
+
+    await sql`
+      INSERT INTO staff (id, username, password_hash, name)
+      VALUES (${admin.id}, ${admin.username}, ${passwordHash}, ${admin.name})
+    `;
+    console.log(
+      `Created admin staff (username: ${admin.username}, password: 12345).`
+    );
+  }
 }
 
 async function migrateCustomers(customers, transactions) {

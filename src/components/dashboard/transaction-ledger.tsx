@@ -39,6 +39,8 @@ import {
 } from "@/components/ui/table";
 import { ListPagination } from "@/components/ui/list-pagination";
 import { useLoyalty } from "@/hooks/use-loyalty";
+import { useAuth } from "@/hooks/use-auth";
+import { canManageTransactionHistory } from "@/config/auth";
 import { isNonMemberCustomer } from "@/lib/data/non-member";
 import type { Transaction } from "@/types";
 
@@ -145,6 +147,8 @@ export function TransactionLedger() {
     clearTransactionHistory,
     deleteTransaction,
   } = useLoyalty();
+  const { username } = useAuth();
+  const canManageHistory = canManageTransactionHistory(username);
   const [customerFilter, setCustomerFilter] = useState(ALL_CUSTOMERS);
   const [confirmClearOpen, setConfirmClearOpen] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<Transaction | null>(null);
@@ -184,6 +188,7 @@ export function TransactionLedger() {
     customerFilter === ALL_CUSTOMERS
       ? null
       : getCustomerById(customerFilter)?.name ?? "Unknown";
+  const tableColSpan = canManageHistory ? 5 : 4;
 
   async function handleClear() {
     await clearTransactionHistory();
@@ -221,7 +226,7 @@ export function TransactionLedger() {
                 : `Showing activity for ${selectedCustomerName}`}
             </CardDescription>
           </div>
-          {transactions.length > 0 && (
+          {canManageHistory && transactions.length > 0 && (
             <Button
               variant="outline"
               size="sm"
@@ -282,21 +287,29 @@ export function TransactionLedger() {
                 </TableHead>
                 <TableHead className="hidden sm:table-cell">Reason</TableHead>
                 <TableHead className="text-right">Activity</TableHead>
-                <TableHead className="w-12">
-                  <span className="sr-only">Actions</span>
-                </TableHead>
+                {canManageHistory && (
+                  <TableHead className="w-12">
+                    <span className="sr-only">Actions</span>
+                  </TableHead>
+                )}
               </TableRow>
             </TableHeader>
             <TableBody>
               {transactions.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
+                  <TableCell
+                    colSpan={tableColSpan}
+                    className="py-8 text-center text-muted-foreground"
+                  >
                     No transactions yet.
                   </TableCell>
                 </TableRow>
               ) : filteredTransactions.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
+                  <TableCell
+                    colSpan={tableColSpan}
+                    className="py-8 text-center text-muted-foreground"
+                  >
                     No transactions for this customer.
                   </TableCell>
                 </TableRow>
@@ -317,21 +330,23 @@ export function TransactionLedger() {
                       <TableCell className="text-right">
                         <TransactionBadge txn={txn} />
                       </TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="size-8 text-muted-foreground hover:text-destructive"
-                          aria-label={`Delete transaction for ${customer?.name ?? "customer"}`}
-                          onClick={() => {
-                            setDeleteError(null);
-                            setPendingDelete(txn);
-                          }}
-                        >
-                          <Trash2 className="size-4" />
-                        </Button>
-                      </TableCell>
+                      {canManageHistory && (
+                        <TableCell className="text-right">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="size-8 text-muted-foreground hover:text-destructive"
+                            aria-label={`Delete transaction for ${customer?.name ?? "customer"}`}
+                            onClick={() => {
+                              setDeleteError(null);
+                              setPendingDelete(txn);
+                            }}
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
+                        </TableCell>
+                      )}
                     </TableRow>
                   );
                 })

@@ -22,6 +22,7 @@ import type {
   UpdateCustomerInput,
   UpdateCustomerProfileInput,
   UpdatePendingOrderInput,
+  UpdateCompletedOrderInput,
   VoucherApplyOption,
 } from "@/types";
 import { generateId, normalizeContact } from "./loyalty-calculations";
@@ -1363,6 +1364,293 @@ export async function getCompletedOrders(): Promise<CompletedOrder[]> {
       items: parsePendingOrderItems(row.items),
     })
   );
+}
+
+export async function getCompletedOrderById(
+  orderId: string
+): Promise<CompletedOrder | null> {
+  await ensurePaymentTypeColumns();
+  const sql = getSql();
+  const rows = await sql`
+    SELECT
+      co.id,
+      co.customer_id,
+      c.name AS customer_name,
+      co.transaction_id,
+      co.notes,
+      co.voucher_to_apply,
+      co.payment_type,
+      co.items,
+      co.subtotal,
+      co.discount,
+      co.total,
+      co.points_earned,
+      co.created_at,
+      co.completed_at
+    FROM completed_orders co
+    INNER JOIN customers c ON c.id = co.customer_id
+    WHERE co.id = ${orderId}
+    LIMIT 1
+  `;
+
+  if (rows.length === 0) return null;
+
+  const row = rows[0] as CompletedOrderRecord;
+  return enrichCompletedOrder({
+    ...row,
+    items: parsePendingOrderItems(row.items),
+  });
+}
+
+export async function updateCompletedOrder(
+  orderId: string,
+  input: UpdateCompletedOrderInput
+): Promise<CompletedOrder> {
+  const existing = await getCompletedOrderById(orderId);
+  if (!existing) throw new Error("Completed order not found.");
+
+  const selectedItems = input.items.filter((item) => item.quantity > 0);
+  if (selectedItems.length === 0) {
+    throw new Error("Add at least one product.");
+  }
+
+  for (const item of selectedItems) {
+    if (!Number.isInteger(item.quantity) || item.quantity <= 0) {
+      throw new Error("Invalid product quantity.");
+    }
+  }
+
+  const catalog = await getProducts();
+  const normalizedItems = await normalizePendingOrderItems(
+    selectedItems,
+    catalog
+  );
+
+  const notes =
+    typeof input.notes === "string" ? input.notes.trim() : existing.notes;
+  const paymentType =
+    input.paymentType !== undefined
+      ? normalizePaymentType(input.paymentType)
+      : existing.paymentType;
+
+  let voucherToApply = input.voucherToApply ?? existing.voucherToApply;
+  if (isNonMemberCustomer(existing.customerId)) {
+    voucherToApply = "none";
+  }
+
+  const customerBefore = await getCustomerRow(existing.customerId);
+  if (!customerBefore) throw new Error("Customer not found.");
+
+  const vouchersAfterReverse =
+    Number(customerBefore.vouchers_available) +
+    (existing.voucherToApply === "voucher" ? 1 : 0);
+  const freeDrinkAfterReverse =
+    Number(customerBefore.free_drink_vouchers_available) +
+    (existing.voucherToApply === "free-drink-voucher" ? 1 : 0);
+
+  if (voucherToApply === "voucher" && vouchersAfterReverse <= 0) {
+    throw new Error("No 50% off vouchers available for this customer.");
+  }
+  if (voucherToApply === "free-drink-voucher" && freeDrinkAfterReverse <= 0) {
+    throw new Error("No free drink vouchers available for this customer.");
+  }
+
+  await reverseCompletedOrderLoyalty(existing);
+
+  const transaction = await logPurchase({
+    customerId: existing.customerId,
+    items: normalizedItems,
+    notes: notes || undefined,
+  });
+
+  if (voucherToApply === "voucher") {
+    await redeemVoucher({ customerId: existing.customerId, count: 1 });
+  } else if (voucherToApply === "free-drink-voucher") {
+    await redeemFreeDrinkVoucher({ customerId: existing.customerId, count: 1 });
+  }
+
+  const enriched = enrichPendingOrder(
+    {
+      id: existing.id,
+      customer_id: existing.customerId,
+      customer_name: existing.customerName,
+      notes,
+      voucher_to_apply: voucherToApply,
+      payment_type: paymentType,
+      items: normalizedItems,
+      created_at: existing.createdAt,
+    },
+    catalog
+  );
+
+  await ensurePaymentTypeColumns();
+  const sql = getSql();
+  const rows = await sql`
+    UPDATE completed_orders
+    SET
+      transaction_id = ${transaction.id},
+      notes = ${notes},
+      voucher_to_apply = ${voucherToApply},
+      payment_type = ${paymentType},
+      items = ${JSON.stringify(normalizedItems)}::jsonb,
+      subtotal = ${enriched.subtotal},
+      discount = ${enriched.discount},
+      total = ${enriched.total},
+      points_earned = ${enriched.pointsEarned}
+    WHERE id = ${orderId}
+    RETURNING id
+  `;
+  if (rows.length === 0) {
+    throw new Error("Completed order not found.");
+  }
+
+  const updated = await getCompletedOrderById(orderId);
+  if (!updated) throw new Error("Failed to update completed order.");
+  return updated;
+}
+
+async function reverseCompletedOrderLoyalty(
+  order: CompletedOrder
+): Promise<void> {
+  const customer = await getCustomerRow(order.customerId);
+  if (!customer) throw new Error("Customer not found.");
+
+  const sql = getSql();
+  const relatedTxns = await sql`
+    SELECT id, type, points, reason
+    FROM transactions
+    WHERE customer_id = ${order.customerId}
+      AND created_at >= ${order.completedAt}::timestamptz - INTERVAL '2 minutes'
+      AND created_at <= ${order.completedAt}::timestamptz + INTERVAL '2 minutes'
+    ORDER BY created_at ASC
+  `;
+
+  type RelatedTxn = {
+    id: string;
+    type: string;
+    points: number;
+    reason: string;
+  };
+
+  const related = relatedTxns as RelatedTxn[];
+  const relatedIds = new Set(related.map((txn) => txn.id));
+  if (order.transactionId) {
+    relatedIds.add(order.transactionId);
+  }
+
+  let pointsDelta = 0;
+  let totalPointsEarnedDelta = 0;
+  let consecutiveDelta = 0;
+  let vouchersAvailableDelta = 0;
+  let freeDrinkVouchersAvailableDelta = 0;
+  let totalVouchersEarnedDelta = 0;
+  let totalFreeDrinkVouchersEarnedDelta = 0;
+  let restoredRedeemVoucher = false;
+  let restoredRedeemFreeDrink = false;
+
+  for (const txn of related) {
+    if (txn.type === "earn") {
+      const points = Number(txn.points);
+      pointsDelta -= points;
+      totalPointsEarnedDelta -= points;
+      consecutiveDelta -= points;
+      continue;
+    }
+    if (txn.type === "redeem") {
+      pointsDelta += Number(txn.points);
+      continue;
+    }
+    if (txn.type === "voucher_earn") {
+      vouchersAvailableDelta -= 1;
+      totalVouchersEarnedDelta -= 1;
+      continue;
+    }
+    if (txn.type === "free_drink_voucher_earn") {
+      freeDrinkVouchersAvailableDelta -= 1;
+      totalFreeDrinkVouchersEarnedDelta -= 1;
+      continue;
+    }
+    if (txn.type === "voucher_redeem") {
+      vouchersAvailableDelta += 1;
+      restoredRedeemVoucher = true;
+      continue;
+    }
+    if (txn.type === "free_drink_voucher_redeem") {
+      freeDrinkVouchersAvailableDelta += 1;
+      restoredRedeemFreeDrink = true;
+    }
+  }
+
+  if (related.every((txn) => txn.type !== "earn") && order.pointsEarned > 0) {
+    pointsDelta -= order.pointsEarned;
+    totalPointsEarnedDelta -= order.pointsEarned;
+    consecutiveDelta -= order.pointsEarned;
+  }
+
+  if (order.voucherToApply === "voucher" && !restoredRedeemVoucher) {
+    vouchersAvailableDelta += 1;
+  }
+  if (
+    order.voucherToApply === "free-drink-voucher" &&
+    !restoredRedeemFreeDrink
+  ) {
+    freeDrinkVouchersAvailableDelta += 1;
+  }
+
+  const nextPoints = Math.max(0, Number(customer.points) + pointsDelta);
+  const nextTotalPointsEarned = Math.max(
+    0,
+    Number(customer.total_points_earned) + totalPointsEarnedDelta
+  );
+  const nextConsecutive = Math.max(
+    0,
+    Number(customer.consecutive_points_earned) + consecutiveDelta
+  );
+  const nextVouchers = Math.max(
+    0,
+    Number(customer.vouchers_available) + vouchersAvailableDelta
+  );
+  const nextFreeDrink = Math.max(
+    0,
+    Number(customer.free_drink_vouchers_available) +
+      freeDrinkVouchersAvailableDelta
+  );
+  const nextTotalVouchers = Math.max(
+    0,
+    Number(customer.total_vouchers_earned) + totalVouchersEarnedDelta
+  );
+  const nextTotalFreeDrink = Math.max(
+    0,
+    Number(customer.total_free_drink_vouchers_earned) +
+      totalFreeDrinkVouchersEarnedDelta
+  );
+
+  const txnIds = Array.from(relatedIds);
+  const queries = [
+    sql`
+      UPDATE customers
+      SET
+        points = ${nextPoints},
+        total_points_earned = ${nextTotalPointsEarned},
+        consecutive_points_earned = ${nextConsecutive},
+        vouchers_available = ${nextVouchers},
+        free_drink_vouchers_available = ${nextFreeDrink},
+        total_vouchers_earned = ${nextTotalVouchers},
+        total_free_drink_vouchers_earned = ${nextTotalFreeDrink}
+      WHERE id = ${order.customerId}
+    `,
+    sql`
+      UPDATE completed_orders
+      SET transaction_id = NULL
+      WHERE id = ${order.id}
+    `,
+  ];
+
+  for (const txnId of txnIds) {
+    queries.push(sql`DELETE FROM transactions WHERE id = ${txnId}`);
+  }
+
+  await sql.transaction(queries);
 }
 
 export async function getCustomerTotalVoucherSavings(

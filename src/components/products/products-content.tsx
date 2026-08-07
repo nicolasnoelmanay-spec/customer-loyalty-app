@@ -1,8 +1,7 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
 import {
   Coffee,
   Cookie,
@@ -53,13 +52,7 @@ import {
   resolveQuarterPounderOption,
 } from "@/lib/data/quarter-pounder-options";
 import { isDrinkCategory } from "@/lib/data/product-categories";
-import { mergePurchaseItems } from "@/lib/data/pending-order-utils";
-import {
-  apiCreatePendingOrder,
-  apiUpdatePendingOrder,
-  fetchPendingOrders,
-  fetchProducts,
-} from "@/lib/api/loyalty-client";
+import { apiCreatePendingOrder, fetchProducts } from "@/lib/api/loyalty-client";
 import { useLoyalty } from "@/hooks/use-loyalty";
 import { cn } from "@/lib/utils";
 import {
@@ -69,7 +62,6 @@ import {
 import type {
   DrinkTemperature,
   PaymentType,
-  PendingOrder,
   Product,
   ProductCategory,
   PurchaseItemInput,
@@ -85,13 +77,9 @@ function categoryIcon(category: ProductCategory) {
 }
 
 function ProductsContentInner() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const pendingOrderId = searchParams.get("pendingOrderId");
   const { customers } = useLoyalty();
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [editingOrder, setEditingOrder] = useState<PendingOrder | null>(null);
   const [customerId, setCustomerId] = useState(NON_MEMBER_CUSTOMER_ID);
   const [cart, setCart] = useState<Cart>({});
   const [notes, setNotes] = useState("");
@@ -124,42 +112,6 @@ function ProductsContentInner() {
       cancelled = true;
     };
   }, []);
-
-  useEffect(() => {
-    if (!pendingOrderId) {
-      setEditingOrder(null);
-      return;
-    }
-
-    let cancelled = false;
-    fetchPendingOrders()
-      .then((orders) => {
-        if (cancelled) return;
-        const order = orders.find((entry) => entry.id === pendingOrderId);
-        if (!order) {
-          setEditingOrder(null);
-          setError("Pending order not found. It may have been completed or removed.");
-          router.replace("/products");
-          return;
-        }
-        setEditingOrder(order);
-        setCustomerId(order.customerId);
-        setNotes(order.notes);
-        setVoucherToApply(order.voucherToApply);
-        setPaymentType(order.paymentType);
-        setCart({});
-        setSuccess(null);
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setError("Failed to load pending order.");
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [pendingOrderId, router]);
 
   const cartItems: PurchaseItemInput[] = useMemo(
     () =>
@@ -200,7 +152,6 @@ function ProductsContentInner() {
     [cartItems, products]
   );
 
-  const isEditingPendingOrder = editingOrder !== null;
   const isNonMemberCheckout = isNonMemberCustomer(customerId);
   const effectiveVoucherToApply = isNonMemberCheckout ? "none" : voucherToApply;
 
@@ -333,15 +284,10 @@ function ProductsContentInner() {
   function handleNewTransaction() {
     resetCheckout();
     setSuccess(null);
-    setEditingOrder(null);
     setCustomerId(NON_MEMBER_CUSTOMER_ID);
-    if (pendingOrderId) {
-      router.replace("/products");
-    }
   }
 
   function handleCustomerChange(nextCustomerId: string) {
-    if (isEditingPendingOrder) return;
     setCustomerId(nextCustomerId);
     setVoucherToApply("none");
   }
@@ -365,37 +311,19 @@ function ProductsContentInner() {
       const effectiveVoucher = isNonMemberCustomer(customerId)
         ? "none"
         : voucherToApply;
-      if (editingOrder) {
-        const mergedItems = mergePurchaseItems(editingOrder.items, cartItems);
-        const updated = await apiUpdatePendingOrder(editingOrder.id, {
-          items: mergedItems,
-          notes: notes.trim() || undefined,
-          voucherToApply: effectiveVoucher,
-          paymentType,
-        });
-        setCart({});
-        setEditingOrder(updated);
-        setSuccess("Items added to pending order.");
-        router.replace("/products");
-      } else {
-        await apiCreatePendingOrder({
-          customerId,
-          items: cartItems,
-          notes: notes.trim() || undefined,
-          voucherToApply: effectiveVoucher,
-          paymentType,
-        });
-        resetCheckout();
-        setCustomerId(NON_MEMBER_CUSTOMER_ID);
-        setSuccess("Added to pending orders.");
-      }
+      await apiCreatePendingOrder({
+        customerId,
+        items: cartItems,
+        notes: notes.trim() || undefined,
+        voucherToApply: effectiveVoucher,
+        paymentType,
+      });
+      resetCheckout();
+      setCustomerId(NON_MEMBER_CUSTOMER_ID);
+      setSuccess("Added to pending orders.");
     } catch (err) {
       setError(
-        err instanceof Error
-          ? err.message
-          : isEditingPendingOrder
-            ? "Failed to update pending order."
-            : "Failed to add pending order."
+        err instanceof Error ? err.message : "Failed to add pending order."
       );
     } finally {
       setIsSubmitting(false);
@@ -609,26 +537,10 @@ function ProductsContentInner() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Products</h1>
           <p className="text-muted-foreground">
-            {isEditingPendingOrder
-              ? `Add more items to ${editingOrder.customerName}'s pending order.`
-              : `Build an order of drinks, frappés, and snacks for ${loyaltyConfig.programName}.`}
+            Build an order of drinks, frappés, and snacks for{" "}
+            {loyaltyConfig.programName}.
           </p>
         </div>
-
-        {isEditingPendingOrder && (
-          <div className="rounded-lg border border-emerald-600/40 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-200">
-            Adding items to{" "}
-            <span className="font-medium">{editingOrder.customerName}</span>
-            &apos;s pending order ({editingOrder.items.length} item
-            {editingOrder.items.length === 1 ? "" : "s"} already queued).{" "}
-            <Link
-              href="/pending-orders"
-              className="font-medium underline underline-offset-2"
-            >
-              Back to pending orders
-            </Link>
-          </div>
-        )}
 
         <Tabs defaultValue="all">
           <TabsList className="grid w-full grid-cols-4">
@@ -670,7 +582,6 @@ function ProductsContentInner() {
               customers={customers}
               onCustomerIdChange={handleCustomerChange}
               onScanError={setError}
-              disabled={isEditingPendingOrder}
             />
 
             {selectedCustomer && !isNonMemberCheckout && (
@@ -924,16 +835,10 @@ function ProductsContentInner() {
               disabled={isSubmitting || cartProducts.length === 0}
             >
               {isSubmitting
-                ? isEditingPendingOrder
-                  ? "Updating..."
-                  : "Adding..."
+                ? "Adding..."
                 : cartProducts.length > 0
-                  ? isEditingPendingOrder
-                    ? `Add Items to Order · ${formatCurrency(checkoutTotal.total)}`
-                    : `Add to Pending Order · ${formatCurrency(checkoutTotal.total)}`
-                  : isEditingPendingOrder
-                    ? "Add Items to Order"
-                    : "Add to Pending Order"}
+                  ? `Add to Pending Order · ${formatCurrency(checkoutTotal.total)}`
+                  : "Add to Pending Order"}
             </Button>
 
             <Button
@@ -953,15 +858,5 @@ function ProductsContentInner() {
 }
 
 export function ProductsContent() {
-  return (
-    <Suspense
-      fallback={
-        <p className="py-12 text-center text-sm text-muted-foreground">
-          Loading products…
-        </p>
-      }
-    >
-      <ProductsContentInner />
-    </Suspense>
-  );
+  return <ProductsContentInner />;
 }

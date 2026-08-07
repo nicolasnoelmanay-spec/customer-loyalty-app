@@ -13,6 +13,7 @@ import { apiGetSession, apiLogin, apiLogout } from "@/lib/api/loyalty-client";
 interface AuthContextValue {
   isReady: boolean;
   isAuthenticated: boolean;
+  username: string | null;
   login: (username: string, password: string) => Promise<boolean>;
   logout: () => Promise<void>;
 }
@@ -21,16 +22,23 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [username, setUsername] = useState<string | null>(null);
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     apiGetSession()
-      .then((authenticated) => {
-        if (!cancelled) setIsAuthenticated(authenticated);
+      .then((session) => {
+        if (!cancelled) {
+          setIsAuthenticated(session.authenticated);
+          setUsername(session.username);
+        }
       })
       .catch(() => {
-        if (!cancelled) setIsAuthenticated(false);
+        if (!cancelled) {
+          setIsAuthenticated(false);
+          setUsername(null);
+        }
       })
       .finally(() => {
         if (!cancelled) setIsReady(true);
@@ -40,10 +48,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const login = useCallback(async (username: string, password: string) => {
+  const login = useCallback(async (usernameValue: string, password: string) => {
     try {
-      await apiLogin(username, password);
+      const result = await apiLogin(usernameValue, password);
       setIsAuthenticated(true);
+      setUsername(result.username);
       return true;
     } catch {
       return false;
@@ -55,12 +64,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await apiLogout();
     } finally {
       setIsAuthenticated(false);
+      setUsername(null);
     }
   }, []);
 
   return (
     <AuthContext.Provider
-      value={{ isReady, isAuthenticated, login, logout }}
+      value={{ isReady, isAuthenticated, username, login, logout }}
     >
       {children}
     </AuthContext.Provider>

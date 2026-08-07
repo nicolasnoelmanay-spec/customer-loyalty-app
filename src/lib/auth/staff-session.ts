@@ -17,20 +17,27 @@ export async function createStaffSession(staffId: string): Promise<string> {
   return sessionId;
 }
 
-export async function getStaffSession(): Promise<{ staffId: string } | null> {
+export async function getStaffSession(): Promise<{
+  staffId: string;
+  username: string;
+} | null> {
   const cookieStore = await cookies();
   const sessionId = cookieStore.get(SESSION_COOKIE)?.value;
   if (!sessionId) return null;
 
   const sql = getSql();
   const rows = await sql`
-    SELECT staff_id
-    FROM staff_sessions
-    WHERE id = ${sessionId} AND expires_at > NOW()
+    SELECT ss.staff_id, s.username
+    FROM staff_sessions ss
+    INNER JOIN staff s ON s.id = ss.staff_id
+    WHERE ss.id = ${sessionId} AND ss.expires_at > NOW()
   `;
 
   if (rows.length === 0) return null;
-  return { staffId: rows[0].staff_id as string };
+  return {
+    staffId: rows[0].staff_id as string,
+    username: rows[0].username as string,
+  };
 }
 
 export async function setSessionCookie(sessionId: string) {
