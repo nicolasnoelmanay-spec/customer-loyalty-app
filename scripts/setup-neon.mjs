@@ -120,6 +120,19 @@ CREATE TABLE IF NOT EXISTS completed_orders (
 );
 
 CREATE INDEX IF NOT EXISTS completed_orders_completed_at_idx ON completed_orders(completed_at DESC);
+
+CREATE TABLE IF NOT EXISTS expenses (
+  id TEXT PRIMARY KEY,
+  description TEXT NOT NULL,
+  amount INTEGER NOT NULL,
+  category TEXT NOT NULL,
+  payment_type TEXT NOT NULL DEFAULT 'cash',
+  notes TEXT NOT NULL DEFAULT '',
+  incurred_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS expenses_incurred_at_idx ON expenses(incurred_at DESC);
 `;
 
 const seedCustomer = {

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 
 export const DEFAULT_PAGE_SIZE = 10;
 export const CUSTOMER_PAGE_SIZE = 5;
+export const EXPENSE_PAGE_SIZE = 5;
 
 export function usePagination<T>(
   items: T[],

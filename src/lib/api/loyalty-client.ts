@@ -1,8 +1,10 @@
 import type {
   CreateCustomerInput,
+  CreateExpenseInput,
   CreatePendingOrderInput,
   CompletedOrder,
   Customer,
+  Expense,
   LogPurchaseInput,
   LoyaltyData,
   PendingOrder,
@@ -13,6 +15,7 @@ import type {
   RedeemVoucherInput,
   Transaction,
   UpdateCustomerInput,
+  UpdateExpenseInput,
   UpdatePendingOrderInput,
   UpdateCompletedOrderInput,
 } from "@/types";
@@ -205,6 +208,8 @@ export async function apiLogPurchase(
       drinkCount: input.drinkCount,
       items: input.items,
       notes: input.notes,
+      additionalSales: input.additionalSales,
+      paymentType: input.paymentType,
     }),
   });
   return parseJson(response);
@@ -311,4 +316,45 @@ export async function apiGetSession(): Promise<{
   return parseJson<{ authenticated: boolean; username: string | null }>(
     response
   );
+}
+
+export async function fetchExpenses(): Promise<Expense[]> {
+  const response = await fetch("/api/expenses", {
+    credentials: "include",
+  });
+  const data = await parseJson<{ expenses: Expense[] }>(response);
+  return data.expenses;
+}
+
+export async function apiCreateExpense(
+  input: CreateExpenseInput
+): Promise<Expense> {
+  const response = await fetch("/api/expenses", {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  return parseJson(response);
+}
+
+export async function apiUpdateExpense(
+  expenseId: string,
+  input: UpdateExpenseInput
+): Promise<Expense> {
+  const response = await fetch(`/api/expenses/${expenseId}`, {
+    method: "PATCH",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  return parseJson(response);
+}
+
+export async function apiDeleteExpense(expenseId: string): Promise<void> {
+  const response = await fetch(`/api/expenses/${expenseId}`, {
+    method: "DELETE",
+    credentials: "include",
+  });
+  await parseJson(response);
 }

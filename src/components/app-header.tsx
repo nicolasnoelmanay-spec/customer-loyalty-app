@@ -17,7 +17,16 @@ import { useAuth } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils";
 
 interface AppHeaderProps {
-  active?: "home" | "dashboard" | "products" | "pending-orders" | "completed-orders" | "lookup" | "login";
+  active?:
+    | "home"
+    | "dashboard"
+    | "products"
+    | "pending-orders"
+    | "completed-orders"
+    | "expenses"
+    | "summary"
+    | "lookup"
+    | "login";
 }
 
 const staffLinks = [
@@ -25,6 +34,8 @@ const staffLinks = [
   { href: "/products", label: "Products", key: "products" as const },
   { href: "/pending-orders", label: "Pending Orders", key: "pending-orders" as const },
   { href: "/completed-orders", label: "Completed Orders", key: "completed-orders" as const },
+  { href: "/expenses", label: "Expenses", key: "expenses" as const },
+  { href: "/summary", label: "Summary", key: "summary" as const },
   { href: "/lookup", label: "Customer Lookup", key: "lookup" as const },
 ];
 
@@ -44,6 +55,8 @@ export function AppHeader({ active }: AppHeaderProps) {
       active === "products" ||
       active === "pending-orders" ||
       active === "completed-orders" ||
+      active === "expenses" ||
+      active === "summary" ||
       active === "lookup");
 
   return (

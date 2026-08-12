@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+import { Receipt, Scale } from "lucide-react";
 import { AddCustomerDialog } from "@/components/dashboard/add-customer-dialog";
 import { CustomerDirectory } from "@/components/dashboard/customer-directory";
 import { DashboardSkeleton } from "@/components/dashboard/dashboard-skeleton";
@@ -10,6 +12,8 @@ import { ScanCustomerDialog } from "@/components/dashboard/scan-customer-dialog"
 import { TransactionLedger } from "@/components/dashboard/transaction-ledger";
 import { loyaltyConfig } from "@/config/loyalty";
 import { useLoyalty } from "@/hooks/use-loyalty";
+import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 export function DashboardContent() {
   const { isReady } = useLoyalty();
@@ -23,7 +27,7 @@ export function DashboardContent() {
             Manage customers and loyalty points for {loyaltyConfig.programName}
           </p>
         </div>
-        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap [&_button]:w-full sm:[&_button]:w-auto">
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap [&_button]:w-full sm:[&_button]:w-auto [&_a]:w-full sm:[&_a]:w-auto">
           {isReady && (
             <>
               <AddCustomerDialog />
@@ -31,6 +35,20 @@ export function DashboardContent() {
               <ScanCustomerDialog />
               <LogPurchaseDialog />
               <RedeemPointsDialog />
+              <Link
+                href="/expenses"
+                className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+              >
+                <Receipt className="size-4" />
+                Expenses
+              </Link>
+              <Link
+                href="/summary"
+                className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+              >
+                <Scale className="size-4" />
+                Summary
+              </Link>
             </>
           )}
         </div>

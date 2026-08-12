@@ -63,11 +63,16 @@ export interface UpdateCustomerProfileInput {
   email: string;
 }
 
+export type PaymentType = "cash" | "gcash";
+
 export interface LogPurchaseInput {
   customerId: string;
   drinkCount?: number;
   items?: PurchaseItemInput[];
   notes?: string;
+  /** Extra peso sales logged with coffee drinks (snacks, add-ons). Does not earn points. */
+  additionalSales?: number;
+  paymentType?: PaymentType;
 }
 
 export type ProductCategory = "drink" | "frappe" | "snack";
@@ -97,8 +102,6 @@ export interface PurchaseItemInput {
 }
 
 export type VoucherApplyOption = "none" | "voucher" | "free-drink-voucher";
-
-export type PaymentType = "cash" | "gcash";
 
 export interface PendingOrder {
   id: string;
@@ -158,4 +161,45 @@ export interface RedeemFreeDrinkVoucherInput {
   customerId: string;
   count?: number;
   reason?: string;
+}
+
+export const EXPENSE_CATEGORIES = [
+  "ingredients",
+  "supplies",
+  "utilities",
+  "rent",
+  "payroll",
+  "maintenance",
+  "other",
+] as const;
+
+export type ExpenseCategory = (typeof EXPENSE_CATEGORIES)[number];
+
+export interface Expense {
+  id: string;
+  description: string;
+  amount: number;
+  category: ExpenseCategory;
+  paymentType: PaymentType;
+  notes: string;
+  incurredAt: string;
+  createdAt: string;
+}
+
+export interface CreateExpenseInput {
+  description: string;
+  amount: number;
+  category: ExpenseCategory;
+  paymentType?: PaymentType;
+  notes?: string;
+  incurredAt?: string;
+}
+
+export interface UpdateExpenseInput {
+  description: string;
+  amount: number;
+  category: ExpenseCategory;
+  paymentType: PaymentType;
+  notes?: string;
+  incurredAt: string;
 }

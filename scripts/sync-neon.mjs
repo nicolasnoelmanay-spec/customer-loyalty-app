@@ -165,6 +165,19 @@ CREATE TABLE IF NOT EXISTS completed_orders (
 );
 
 CREATE INDEX IF NOT EXISTS completed_orders_completed_at_idx ON completed_orders(completed_at DESC);
+
+CREATE TABLE IF NOT EXISTS expenses (
+  id TEXT PRIMARY KEY,
+  description TEXT NOT NULL,
+  amount INTEGER NOT NULL,
+  category TEXT NOT NULL,
+  payment_type TEXT NOT NULL DEFAULT 'cash',
+  notes TEXT NOT NULL DEFAULT '',
+  incurred_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS expenses_incurred_at_idx ON expenses(incurred_at DESC);
 `;
 
 const MIGRATIONS = [
@@ -209,9 +222,15 @@ const products = await readTable(source, "products", "sort_order ASC");
 const transactions = await readTable(source, "transactions");
 const pendingOrders = await readTable(source, "pending_orders");
 const completedOrders = await readTable(source, "completed_orders");
+let expenses = [];
+try {
+  expenses = await readTable(source, "expenses", "incurred_at ASC");
+} catch {
+  expenses = [];
+}
 
 console.log(
-  `Read from source: ${staff.length} staff, ${customers.length} customers, ${products.length} products, ${transactions.length} transactions, ${pendingOrders.length} pending orders, ${completedOrders.length} completed orders`
+  `Read from source: ${staff.length} staff, ${customers.length} customers, ${products.length} products, ${transactions.length} transactions, ${pendingOrders.length} pending orders, ${completedOrders.length} completed orders, ${expenses.length} expenses`
 );
 
 console.log("Replacing target data...");
@@ -219,6 +238,7 @@ await target`DELETE FROM staff_sessions`;
 await target`DELETE FROM customer_sessions`;
 await target`DELETE FROM completed_orders`;
 await target`DELETE FROM pending_orders`;
+await target`DELETE FROM expenses`;
 await target`DELETE FROM transactions`;
 await target`DELETE FROM customers`;
 await target`DELETE FROM staff`;
@@ -302,7 +322,20 @@ for (const row of completedOrders) {
   `;
 }
 
+for (const row of expenses) {
+  await target`
+    INSERT INTO expenses (
+      id, description, amount, category, payment_type, notes, incurred_at, created_at
+    )
+    VALUES (
+      ${row.id}, ${row.description}, ${row.amount}, ${row.category},
+      ${row.payment_type ?? "cash"}, ${row.notes ?? ""}, ${row.incurred_at},
+      ${row.created_at}
+    )
+  `;
+}
+
 console.log("\nSync complete.");
 console.log(
-  `Target now has: ${await countRows(target, "staff")} staff, ${await countRows(target, "customers")} customers, ${await countRows(target, "products")} products, ${await countRows(target, "transactions")} transactions, ${await countRows(target, "pending_orders")} pending orders, ${await countRows(target, "completed_orders")} completed orders`
+  `Target now has: ${await countRows(target, "staff")} staff, ${await countRows(target, "customers")} customers, ${await countRows(target, "products")} products, ${await countRows(target, "transactions")} transactions, ${await countRows(target, "pending_orders")} pending orders, ${await countRows(target, "completed_orders")} completed orders, ${await countRows(target, "expenses")} expenses`
 );

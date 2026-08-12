@@ -10,3 +10,12 @@ export function formatTransactionDate(iso: string): string {
     timeZone: "Asia/Manila",
   }).format(new Date(iso));
 }
+
+export function formatExpenseDate(iso: string): string {
+  return new Intl.DateTimeFormat("en-PH", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "Asia/Manila",
+  }).format(new Date(iso));
+}
