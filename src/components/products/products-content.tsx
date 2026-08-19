@@ -147,13 +147,14 @@ function ProductsContentInner() {
     [cartItems, products]
   );
 
-  const totals = useMemo(
-    () => calculatePurchaseTotals(cartItems, products),
-    [cartItems, products]
-  );
-
   const isNonMemberCheckout = isNonMemberCustomer(customerId);
   const effectiveVoucherToApply = isNonMemberCheckout ? "none" : voucherToApply;
+
+  const totals = useMemo(
+    () =>
+      calculatePurchaseTotals(cartItems, products, effectiveVoucherToApply),
+    [cartItems, products, effectiveVoucherToApply]
+  );
 
   const checkoutTotal = useMemo(
     () =>
@@ -663,7 +664,7 @@ function ProductsContentInner() {
                             {loyaltyConfig.freeDrinkVoucher.label}
                           </span>
                           <span className="block text-muted-foreground">
-                            Uses 1 from stack · does not affect points
+                            Uses 1 from stack · free drink does not earn a point
                           </span>
                         </button>
                       )}

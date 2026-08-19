@@ -719,7 +719,11 @@ export async function logPurchase(
       );
     });
 
-    const totals = calculatePurchaseTotals(normalizedItems, products);
+    const totals = calculatePurchaseTotals(
+      normalizedItems,
+      products,
+      input.voucherToApply ?? "none"
+    );
     points = totals.pointsEarned;
     reason = `${totals.summary} (${formatCurrency(totals.subtotal)})`;
     if (notes) reason += ` — ${notes}`;
@@ -1511,6 +1515,7 @@ export async function updateCompletedOrder(
     customerId: existing.customerId,
     items: normalizedItems,
     notes: notes || undefined,
+    voucherToApply,
   });
 
   if (voucherToApply === "voucher") {
@@ -1793,6 +1798,7 @@ export async function completePendingOrder(orderId: string): Promise<Transaction
     customerId: record.customer_id,
     items,
     notes: record.notes || undefined,
+    voucherToApply,
   });
 
   if (voucherToApply === "voucher") {

@@ -294,9 +294,13 @@ export function CompletedOrdersContent() {
 
   const editPreview = useMemo(() => {
     const activeItems = editItems.filter((item) => item.quantity > 0);
-    const totals = calculatePurchaseTotals(activeItems, products);
     const cartProducts = cartProductsFromItems(activeItems, products);
     const effectiveVoucher = isEditingNonMember ? "none" : editVoucherToApply;
+    const totals = calculatePurchaseTotals(
+      activeItems,
+      products,
+      effectiveVoucher
+    );
     const checkout = calculateCheckoutTotal(
       totals.subtotal,
       cartProducts,

@@ -116,7 +116,7 @@ export function enrichPendingOrder(
     ? "none"
     : (record.voucher_to_apply as VoucherApplyOption);
   const cartProducts = cartProductsFromItems(items, products);
-  const totals = calculatePurchaseTotals(items, products);
+  const totals = calculatePurchaseTotals(items, products, voucherToApply);
   const checkout = calculateCheckoutTotal(
     totals.subtotal,
     cartProducts,

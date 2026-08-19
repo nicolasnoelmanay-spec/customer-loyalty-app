@@ -65,6 +65,8 @@ export interface UpdateCustomerProfileInput {
 
 export type PaymentType = "cash" | "gcash";
 
+export type VoucherApplyOption = "none" | "voucher" | "free-drink-voucher";
+
 export interface LogPurchaseInput {
   customerId: string;
   drinkCount?: number;
@@ -73,6 +75,7 @@ export interface LogPurchaseInput {
   /** Extra peso sales logged with coffee drinks (snacks, add-ons). Does not earn points. */
   additionalSales?: number;
   paymentType?: PaymentType;
+  voucherToApply?: VoucherApplyOption;
 }
 
 export type ProductCategory = "drink" | "frappe" | "snack";
@@ -100,8 +103,6 @@ export interface PurchaseItemInput {
   temperature?: DrinkTemperature;
   quarterPounderOption?: QuarterPounderOption;
 }
-
-export type VoucherApplyOption = "none" | "voucher" | "free-drink-voucher";
 
 export interface PendingOrder {
   id: string;
