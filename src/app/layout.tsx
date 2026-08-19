@@ -21,6 +21,10 @@ export const metadata: Metadata = {
   title: `${loyaltyConfig.programName} | Loyalty Points Tracker`,
   description:
     "Manage customer loyalty points, track purchases, and let customers check their rewards.",
+  icons: {
+    icon: [{ url: "/coffeesentials-mark.png", type: "image/png" }],
+    apple: [{ url: "/coffeesentials-mark.png" }],
+  },
 };
 
 export const viewport = {
