@@ -738,6 +738,16 @@ export async function logPurchase(
     reason = notes ? `${drinkSummary} — ${notes}` : drinkSummary;
   }
 
+  const additionalSales =
+    typeof input.additionalSales === "number" &&
+    Number.isInteger(input.additionalSales) &&
+    input.additionalSales > 0
+      ? input.additionalSales
+      : 0;
+  if (additionalSales > 0) {
+    reason = `${reason} — Additional sales ${formatCurrency(additionalSales)}`;
+  }
+
   if (isNonMemberCustomer(input.customerId)) {
     points = 0;
     reason = `${reason} — Non-member (no loyalty)`;
@@ -837,6 +847,46 @@ export async function logPurchase(
   }
 
   await sql.transaction(queries);
+
+  if (additionalSales > 0) {
+    await ensurePaymentTypeColumns();
+    const paymentType = normalizePaymentType(input.paymentType);
+    const orderNotes = notes
+      ? `Logged with coffee drinks — ${notes}`
+      : "Logged with coffee drinks";
+    await sql`
+      INSERT INTO completed_orders (
+        id,
+        customer_id,
+        transaction_id,
+        notes,
+        voucher_to_apply,
+        payment_type,
+        items,
+        subtotal,
+        discount,
+        total,
+        points_earned,
+        created_at,
+        completed_at
+      )
+      VALUES (
+        ${generateId("order")},
+        ${input.customerId},
+        ${transactionId},
+        ${orderNotes},
+        ${"none"},
+        ${paymentType},
+        ${JSON.stringify([])}::jsonb,
+        ${additionalSales},
+        0,
+        ${additionalSales},
+        0,
+        NOW(),
+        NOW()
+      )
+    `;
+  }
 
   if (vouchersEarned > 0 || freeDrinkVouchersEarned > 0) {
     await sendVoucherEarnedEmailSafely({

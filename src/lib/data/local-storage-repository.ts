@@ -199,6 +199,15 @@ export class LocalStorageLoyaltyRepository implements LoyaltyRepository {
     const notes = input.notes?.trim();
     const drinkSummary = formatDrinkCount(drinkCount);
     let reason = notes ? `${drinkSummary} — ${notes}` : drinkSummary;
+    const additionalSales =
+      typeof input.additionalSales === "number" &&
+      Number.isInteger(input.additionalSales) &&
+      input.additionalSales > 0
+        ? input.additionalSales
+        : 0;
+    if (additionalSales > 0) {
+      reason = `${reason} — Additional sales ₱${additionalSales}`;
+    }
     if (isNonMemberCustomer(input.customerId)) {
       reason = `${reason} — Non-member (no loyalty)`;
     }
