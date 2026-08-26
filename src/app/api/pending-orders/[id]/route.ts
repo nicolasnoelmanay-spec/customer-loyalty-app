@@ -11,6 +11,7 @@ import {
   deletePendingOrder,
   updatePendingOrder,
 } from "@/lib/data/neon-repository";
+import { getLatestQrphPaymentForOrder } from "@/lib/data/qrph-payment-repository";
 import type { PaymentType, VoucherApplyOption } from "@/types";
 
 const voucherOptions = new Set<VoucherApplyOption>([
@@ -104,6 +105,16 @@ export async function DELETE(_request: Request, { params }: RouteParams) {
     if ("error" in auth) return auth.error;
 
     const { id } = await params;
+    const qrph = await getLatestQrphPaymentForOrder(id);
+    if (qrph && (qrph.status === "pending" || qrph.status === "paid")) {
+      return jsonError(
+        qrph.status === "paid"
+          ? "This order has a confirmed QR Ph payment. Tap Complete instead of deleting."
+          : "This order has an open QR Ph payment. Complete it or wait for the QR to expire before deleting.",
+        409
+      );
+    }
+
     await deletePendingOrder(id);
     return NextResponse.json({ ok: true });
   } catch (error) {

@@ -204,3 +204,55 @@ export interface UpdateExpenseInput {
   notes?: string;
   incurredAt: string;
 }
+
+export const QRPH_PAYMENT_STATUSES = [
+  "pending",
+  "paid",
+  "failed",
+  "expired",
+] as const;
+
+export type QrphPaymentStatus = (typeof QRPH_PAYMENT_STATUSES)[number];
+
+export interface QrphOrderSnapshot {
+  customerId: string;
+  notes: string;
+  voucherToApply: VoucherApplyOption;
+  paymentType: PaymentType;
+  items: PurchaseItemInput[];
+  createdAt?: string;
+}
+
+export interface QrphPayment {
+  id: string;
+  pendingOrderId: string;
+  amount: number;
+  paymentIntentId: string;
+  clientKey: string;
+  status: QrphPaymentStatus;
+  createdAt: string;
+  updatedAt: string;
+  paidAt: string | null;
+  orderSnapshot: QrphOrderSnapshot | null;
+}
+
+export interface CreateQrphCheckoutInput {
+  orderId: string;
+  amount?: number;
+}
+
+export interface CreateQrphCheckoutResult {
+  paymentIntentId: string;
+  qrCodeUrl: string;
+  orderId: string;
+  amount: number;
+}
+
+export interface QrphOrderPaymentStatus {
+  status: QrphPaymentStatus | "none";
+  amount: number | null;
+  paymentIntentId: string | null;
+  paidAt: string | null;
+  /** False when the pending order row is gone (deleted/completed) but a QR payment still exists. */
+  pendingOrderExists: boolean;
+}

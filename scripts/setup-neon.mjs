@@ -133,6 +133,24 @@ CREATE TABLE IF NOT EXISTS expenses (
 );
 
 CREATE INDEX IF NOT EXISTS expenses_incurred_at_idx ON expenses(incurred_at DESC);
+
+CREATE TABLE IF NOT EXISTS qrph_payments (
+  id TEXT PRIMARY KEY,
+  pending_order_id TEXT NOT NULL,
+  amount INTEGER NOT NULL,
+  payment_intent_id TEXT NOT NULL UNIQUE,
+  client_key TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'pending',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  paid_at TIMESTAMPTZ,
+  order_snapshot JSONB
+);
+
+CREATE INDEX IF NOT EXISTS qrph_payments_pending_order_id_idx
+  ON qrph_payments(pending_order_id);
+CREATE INDEX IF NOT EXISTS qrph_payments_created_at_idx
+  ON qrph_payments(created_at DESC);
 `;
 
 const seedCustomer = {
@@ -433,6 +451,9 @@ await sql.query(
 );
 await sql.query(
   `ALTER TABLE completed_orders ADD COLUMN IF NOT EXISTS payment_type TEXT NOT NULL DEFAULT 'cash'`
+);
+await sql.query(
+  `ALTER TABLE qrph_payments ADD COLUMN IF NOT EXISTS order_snapshot JSONB`
 );
 
 await migrateCustomerAuthColumns();

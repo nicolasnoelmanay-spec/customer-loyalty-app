@@ -56,6 +56,8 @@ import {
   fetchPendingOrders,
   fetchProducts,
 } from "@/lib/api/loyalty-client";
+import { fetchOrderPaymentStatus } from "@/lib/api/paymongo-client";
+import { QrphCheckout } from "@/components/qrph/qrph-checkout";
 import { formatTransactionDate } from "@/lib/format-date";
 import { useLoyalty } from "@/hooks/use-loyalty";
 import { cn } from "@/lib/utils";
@@ -66,6 +68,7 @@ import type {
   Product,
   PurchaseItemInput,
   QuarterPounderOption,
+  QrphPaymentStatus,
   VoucherApplyOption,
 } from "@/types";
 
@@ -106,6 +109,23 @@ export function PendingOrdersContent() {
   >(undefined);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
+  const [qrphStatuses, setQrphStatuses] = useState<
+    Record<string, QrphPaymentStatus | "none">
+  >({});
+
+  const loadQrphStatuses = useCallback(async (pendingOrders: PendingOrder[]) => {
+    const entries = await Promise.all(
+      pendingOrders.map(async (order) => {
+        try {
+          const status = await fetchOrderPaymentStatus(order.id);
+          return [order.id, status.status] as const;
+        } catch {
+          return [order.id, "none"] as const;
+        }
+      })
+    );
+    setQrphStatuses(Object.fromEntries(entries));
+  }, []);
 
   const loadOrders = useCallback(async () => {
     const [loadedOrders, loadedProducts] = await Promise.all([
@@ -114,11 +134,18 @@ export function PendingOrdersContent() {
     ]);
     setOrders(loadedOrders);
     setProducts(loadedProducts);
-  }, []);
+    await loadQrphStatuses(loadedOrders);
+  }, [loadQrphStatuses]);
 
   useEffect(() => {
     let cancelled = false;
-    loadOrders()
+    Promise.all([fetchPendingOrders(), fetchProducts()])
+      .then(async ([loadedOrders, loadedProducts]) => {
+        if (cancelled) return;
+        setOrders(loadedOrders);
+        setProducts(loadedProducts);
+        await loadQrphStatuses(loadedOrders);
+      })
       .catch(() => {
         if (!cancelled) setError("Failed to load pending orders.");
       })
@@ -129,7 +156,7 @@ export function PendingOrdersContent() {
     return () => {
       cancelled = true;
     };
-  }, [loadOrders]);
+  }, [loadQrphStatuses]);
 
   function productName(productId: string) {
     return products.find((product) => product.id === productId)?.name ?? "Item";
@@ -355,9 +382,19 @@ export function PendingOrdersContent() {
                     Added {formatTransactionDate(order.createdAt)}
                   </CardDescription>
                 </div>
-                <Badge variant="secondary" className="w-fit">
-                  {formatCurrency(order.total)}
-                </Badge>
+                <div className="flex flex-wrap gap-2">
+                  {qrphStatuses[order.id] === "paid" && (
+                    <Badge
+                      variant="secondary"
+                      className="w-fit bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                    >
+                      QR paid
+                    </Badge>
+                  )}
+                  <Badge variant="secondary" className="w-fit">
+                    {formatCurrency(order.total)}
+                  </Badge>
+                </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
@@ -450,7 +487,7 @@ export function PendingOrdersContent() {
                   </p>
                 )}
 
-                <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                <div className="flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
                   <Button
                     type="button"
                     variant="outline"
@@ -469,6 +506,18 @@ export function PendingOrdersContent() {
                     <Pencil className="size-4" />
                     Edit
                   </Button>
+                  <QrphCheckout
+                    orderId={order.id}
+                    amount={order.total}
+                    customerName={order.customerName}
+                    disabled={busyOrderId === order.id}
+                    onPaid={() => {
+                      setQrphStatuses((current) => ({
+                        ...current,
+                        [order.id]: "paid",
+                      }));
+                    }}
+                  />
                   <Button
                     type="button"
                     className="bg-emerald-600 hover:bg-emerald-700 text-white"

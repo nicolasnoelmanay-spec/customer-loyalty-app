@@ -11,10 +11,15 @@ import {
   Plus,
   ShoppingBag,
   Ticket,
+  Trash2,
   TrendingUp,
   Users,
 } from "lucide-react";
 import { loyaltyConfig } from "@/config/loyalty";
+import {
+  canDeleteCompletedOrders,
+  canEditCompletedOrders,
+} from "@/config/auth";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
@@ -56,6 +61,7 @@ import {
 import { formatPaymentTypeLabel } from "@/lib/data/pending-order-utils";
 import { isNonMemberCustomer } from "@/lib/data/non-member";
 import {
+  apiDeleteCompletedOrder,
   apiUpdateCompletedOrder,
   fetchCompletedOrders,
   fetchProducts,
@@ -79,7 +85,6 @@ import { exportCompletedOrdersToExcel } from "@/lib/export/completed-orders-exce
 import { usePagination, CUSTOMER_PAGE_SIZE } from "@/hooks/use-pagination";
 import { useLoyalty } from "@/hooks/use-loyalty";
 import { useAuth } from "@/hooks/use-auth";
-import { canEditCompletedOrders } from "@/config/auth";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { ListPagination } from "@/components/ui/list-pagination";
@@ -159,10 +164,12 @@ export function CompletedOrdersContent() {
   const { refresh, getCustomerById } = useLoyalty();
   const { username } = useAuth();
   const canEditOrders = canEditCompletedOrders(username);
+  const canDeleteOrders = canDeleteCompletedOrders(username);
   const [orders, setOrders] = useState<CompletedOrder[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [period, setPeriod] = useState<CompletedOrderPeriod>("daily");
   const [referenceYmd, setReferenceYmd] = useState<ManilaYmd>(() =>
     getManilaTodayYmd()
@@ -389,6 +396,29 @@ export function CompletedOrdersContent() {
     }
   }
 
+  async function handleDelete(order: CompletedOrder) {
+    const confirmed = window.confirm(
+      `Delete completed order for ${order.customerName} (${formatCurrency(order.total)})? Loyalty points and vouchers from this order will be reversed.`
+    );
+    if (!confirmed) return;
+
+    setError(null);
+    setSuccess(null);
+    setBusyOrderId(order.id);
+    try {
+      await apiDeleteCompletedOrder(order.id);
+      setOrders((current) => current.filter((entry) => entry.id !== order.id));
+      await refresh();
+      setSuccess(`Deleted completed order for ${order.customerName}.`);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to delete completed order."
+      );
+    } finally {
+      setBusyOrderId(null);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -426,6 +456,11 @@ export function CompletedOrdersContent() {
       </div>
 
       {error && <p className="text-sm text-destructive">{error}</p>}
+      {success && (
+        <p className="text-sm text-emerald-700 dark:text-emerald-400">
+          {success}
+        </p>
+      )}
 
       {isLoading ? (
         <p className="py-12 text-center text-sm text-muted-foreground">
@@ -748,17 +783,30 @@ export function CompletedOrdersContent() {
                   </p>
                 )}
 
-                {canEditOrders && (
-                  <div className="flex justify-end">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      disabled={busyOrderId === order.id}
-                      onClick={() => openEditDialog(order)}
-                    >
-                      <Pencil className="size-4" />
-                      Edit
-                    </Button>
+                {(canEditOrders || canDeleteOrders) && (
+                  <div className="flex flex-wrap justify-end gap-2">
+                    {canEditOrders && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={busyOrderId === order.id}
+                        onClick={() => openEditDialog(order)}
+                      >
+                        <Pencil className="size-4" />
+                        Edit
+                      </Button>
+                    )}
+                    {canDeleteOrders && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={busyOrderId === order.id}
+                        onClick={() => handleDelete(order)}
+                      >
+                        <Trash2 className="size-4" />
+                        {busyOrderId === order.id ? "Deleting..." : "Delete"}
+                      </Button>
+                    )}
                   </div>
                 )}
               </CardContent>

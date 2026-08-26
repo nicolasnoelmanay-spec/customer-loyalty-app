@@ -1564,6 +1564,23 @@ export async function updateCompletedOrder(
   return updated;
 }
 
+export async function deleteCompletedOrder(orderId: string): Promise<void> {
+  const existing = await getCompletedOrderById(orderId);
+  if (!existing) throw new Error("Completed order not found.");
+
+  await reverseCompletedOrderLoyalty(existing);
+
+  const sql = getSql();
+  const rows = await sql`
+    DELETE FROM completed_orders
+    WHERE id = ${orderId}
+    RETURNING id
+  `;
+  if (rows.length === 0) {
+    throw new Error("Completed order not found.");
+  }
+}
+
 async function reverseCompletedOrderLoyalty(
   order: CompletedOrder
 ): Promise<void> {

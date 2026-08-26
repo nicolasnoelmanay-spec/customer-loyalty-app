@@ -2,7 +2,7 @@ export const authConfig = {
   username: "admin",
   password: "12345",
   storageKey: "loyalty-admin-auth",
-  /** Staff username with elevated permissions (completed-order edit, transaction history) */
+  /** Staff username with elevated permissions (completed-order edit/delete, transaction history) */
   elevatedStaffUsername: "admin2",
 } as const;
 
@@ -21,6 +21,12 @@ export function isElevatedStaff(username: string | null | undefined): boolean {
 }
 
 export function canEditCompletedOrders(
+  username: string | null | undefined
+): boolean {
+  return isElevatedStaff(username);
+}
+
+export function canDeleteCompletedOrders(
   username: string | null | undefined
 ): boolean {
   return isElevatedStaff(username);

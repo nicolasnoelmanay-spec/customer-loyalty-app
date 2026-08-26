@@ -4,11 +4,17 @@ import {
   jsonError,
   requireStaffSession,
 } from "@/lib/api/route-utils";
-import { canEditCompletedOrders } from "@/config/auth";
+import {
+  canDeleteCompletedOrders,
+  canEditCompletedOrders,
+} from "@/config/auth";
 import { isValidDrinkTemperature } from "@/lib/data/drink-temperature";
 import { isValidQuarterPounderOption } from "@/lib/data/quarter-pounder-options";
 import { normalizePaymentType } from "@/lib/data/pending-order-utils";
-import { updateCompletedOrder } from "@/lib/data/neon-repository";
+import {
+  deleteCompletedOrder,
+  updateCompletedOrder,
+} from "@/lib/data/neon-repository";
 import type { PaymentType, VoucherApplyOption } from "@/types";
 
 const voucherOptions = new Set<VoucherApplyOption>([
@@ -101,5 +107,22 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     return NextResponse.json(order);
   } catch (error) {
     return handleRouteError(error, "Failed to update completed order.");
+  }
+}
+
+export async function DELETE(_request: Request, { params }: RouteParams) {
+  try {
+    const auth = await requireStaffSession();
+    if ("error" in auth) return auth.error;
+
+    if (!canDeleteCompletedOrders(auth.session.username)) {
+      return jsonError("Only admin2 can delete completed orders.", 403);
+    }
+
+    const { id } = await params;
+    await deleteCompletedOrder(id);
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    return handleRouteError(error, "Failed to delete completed order.");
   }
 }

@@ -178,6 +178,24 @@ CREATE TABLE IF NOT EXISTS expenses (
 );
 
 CREATE INDEX IF NOT EXISTS expenses_incurred_at_idx ON expenses(incurred_at DESC);
+
+CREATE TABLE IF NOT EXISTS qrph_payments (
+  id TEXT PRIMARY KEY,
+  pending_order_id TEXT NOT NULL,
+  amount INTEGER NOT NULL,
+  payment_intent_id TEXT NOT NULL UNIQUE,
+  client_key TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'pending',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  paid_at TIMESTAMPTZ,
+  order_snapshot JSONB
+);
+
+CREATE INDEX IF NOT EXISTS qrph_payments_pending_order_id_idx
+  ON qrph_payments(pending_order_id);
+CREATE INDEX IF NOT EXISTS qrph_payments_created_at_idx
+  ON qrph_payments(created_at DESC);
 `;
 
 const MIGRATIONS = [
@@ -186,6 +204,7 @@ const MIGRATIONS = [
   `ALTER TABLE products ADD COLUMN IF NOT EXISTS iced_price INTEGER`,
   `ALTER TABLE pending_orders ADD COLUMN IF NOT EXISTS payment_type TEXT NOT NULL DEFAULT 'cash'`,
   `ALTER TABLE completed_orders ADD COLUMN IF NOT EXISTS payment_type TEXT NOT NULL DEFAULT 'cash'`,
+  `ALTER TABLE qrph_payments ADD COLUMN IF NOT EXISTS order_snapshot JSONB`,
 ];
 
 function endpointHint(url) {
@@ -228,9 +247,15 @@ try {
 } catch {
   expenses = [];
 }
+let qrphPayments = [];
+try {
+  qrphPayments = await readTable(source, "qrph_payments", "created_at ASC");
+} catch {
+  qrphPayments = [];
+}
 
 console.log(
-  `Read from source: ${staff.length} staff, ${customers.length} customers, ${products.length} products, ${transactions.length} transactions, ${pendingOrders.length} pending orders, ${completedOrders.length} completed orders, ${expenses.length} expenses`
+  `Read from source: ${staff.length} staff, ${customers.length} customers, ${products.length} products, ${transactions.length} transactions, ${pendingOrders.length} pending orders, ${completedOrders.length} completed orders, ${expenses.length} expenses, ${qrphPayments.length} qrph payments`
 );
 
 console.log("Replacing target data...");
@@ -238,6 +263,7 @@ await target`DELETE FROM staff_sessions`;
 await target`DELETE FROM customer_sessions`;
 await target`DELETE FROM completed_orders`;
 await target`DELETE FROM pending_orders`;
+await target`DELETE FROM qrph_payments`;
 await target`DELETE FROM expenses`;
 await target`DELETE FROM transactions`;
 await target`DELETE FROM customers`;
@@ -335,7 +361,22 @@ for (const row of expenses) {
   `;
 }
 
+for (const row of qrphPayments) {
+  await target`
+    INSERT INTO qrph_payments (
+      id, pending_order_id, amount, payment_intent_id, client_key, status,
+      created_at, updated_at, paid_at, order_snapshot
+    )
+    VALUES (
+      ${row.id}, ${row.pending_order_id}, ${row.amount}, ${row.payment_intent_id},
+      ${row.client_key ?? ""}, ${row.status ?? "pending"}, ${row.created_at},
+      ${row.updated_at ?? row.created_at}, ${row.paid_at ?? null},
+      ${row.order_snapshot ?? null}
+    )
+  `;
+}
+
 console.log("\nSync complete.");
 console.log(
-  `Target now has: ${await countRows(target, "staff")} staff, ${await countRows(target, "customers")} customers, ${await countRows(target, "products")} products, ${await countRows(target, "transactions")} transactions, ${await countRows(target, "pending_orders")} pending orders, ${await countRows(target, "completed_orders")} completed orders, ${await countRows(target, "expenses")} expenses`
+  `Target now has: ${await countRows(target, "staff")} staff, ${await countRows(target, "customers")} customers, ${await countRows(target, "products")} products, ${await countRows(target, "transactions")} transactions, ${await countRows(target, "pending_orders")} pending orders, ${await countRows(target, "completed_orders")} completed orders, ${await countRows(target, "expenses")} expenses, ${await countRows(target, "qrph_payments")} qrph payments`
 );

@@ -146,6 +146,14 @@ export async function apiUpdateCompletedOrder(
   return parseJson(response);
 }
 
+export async function apiDeleteCompletedOrder(orderId: string): Promise<void> {
+  const response = await fetch(`/api/completed-orders/${orderId}`, {
+    method: "DELETE",
+    credentials: "include",
+  });
+  await parseJson(response);
+}
+
 export async function fetchPendingOrders(): Promise<PendingOrder[]> {
   const response = await fetch("/api/pending-orders", {
     credentials: "include",
