@@ -229,3 +229,21 @@ export async function updateQrphPaymentStatus(input: {
 
   return null;
 }
+
+export async function cancelOpenQrphPaymentsForOrder(
+  pendingOrderId: string
+): Promise<number> {
+  await ensureQrphPaymentsTable();
+  const sql = getSql();
+  const now = new Date().toISOString();
+  const rows = await sql`
+    UPDATE qrph_payments
+    SET
+      status = ${"expired"},
+      updated_at = ${now}
+    WHERE pending_order_id = ${pendingOrderId}
+      AND status = ${"pending"}
+    RETURNING id
+  `;
+  return rows.length;
+}

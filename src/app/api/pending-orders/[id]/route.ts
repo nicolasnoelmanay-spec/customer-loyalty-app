@@ -11,7 +11,7 @@ import {
   deletePendingOrder,
   updatePendingOrder,
 } from "@/lib/data/neon-repository";
-import { getLatestQrphPaymentForOrder } from "@/lib/data/qrph-payment-repository";
+import { getLatestQrphPaymentForOrder, cancelOpenQrphPaymentsForOrder } from "@/lib/data/qrph-payment-repository";
 import type { PaymentType, VoucherApplyOption } from "@/types";
 
 const voucherOptions = new Set<VoucherApplyOption>([
@@ -106,13 +106,16 @@ export async function DELETE(_request: Request, { params }: RouteParams) {
 
     const { id } = await params;
     const qrph = await getLatestQrphPaymentForOrder(id);
-    if (qrph && (qrph.status === "pending" || qrph.status === "paid")) {
+    if (qrph?.status === "paid") {
       return jsonError(
-        qrph.status === "paid"
-          ? "This order has a confirmed QR Ph payment. Tap Complete instead of deleting."
-          : "This order has an open QR Ph payment. Complete it or wait for the QR to expire before deleting.",
+        "This order has a confirmed QR Ph payment. Tap Complete instead of deleting.",
         409
       );
+    }
+
+    // Open QR rows often stay "pending" locally after PayMongo expiry — cancel them so staff can remove the order.
+    if (qrph?.status === "pending") {
+      await cancelOpenQrphPaymentsForOrder(id);
     }
 
     await deletePendingOrder(id);
