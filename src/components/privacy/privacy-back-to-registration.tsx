@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -14,13 +14,11 @@ function registrationHref(searchParams: URLSearchParams): string {
   const params = new URLSearchParams({ join: "1" });
   if (searchParams.get("app") === "member" || isMemberWebViewApp()) {
     params.set("app", "member");
-    params.set("customer", "1");
   }
   return `/login?${params.toString()}`;
 }
 
 function PrivacyBackToRegistrationButton() {
-  const router = useRouter();
   const searchParams = useSearchParams();
 
   function handleBack() {
@@ -28,9 +26,10 @@ function PrivacyBackToRegistrationButton() {
       window.close();
       return;
     }
-    // Always open Join explicitly. history.back() often returns to Member login
-    // because the Join tab may not have been written into the URL.
-    router.replace(registrationHref(searchParams));
+    const href = registrationHref(searchParams);
+    // Hard navigation so Android WebView always reloads /login?join=1 (Join tab).
+    // Soft client routing was racing with member-app defaults that open Member login.
+    window.location.assign(href);
   }
 
   return (

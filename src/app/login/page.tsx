@@ -33,7 +33,18 @@ function LoginPageContent() {
     isReady: customerReady,
     isAuthenticated: customerAuthenticated,
   } = useCustomerAuth();
-  const [tab, setTab] = useState<LoginTab>("staff");
+  const [tab, setTab] = useState<LoginTab>(() => {
+    if (searchParams.get("join") === "1") return "join";
+    if (
+      searchParams.get("customer") === "1" ||
+      (searchParams.get("reset") === "1" &&
+        (searchParams.get("token")?.trim() ?? "").length > 0) ||
+      searchParams.get("app") === "member"
+    ) {
+      return "customer";
+    }
+    return "staff";
+  });
   const [customerView, setCustomerView] = useState<"login" | "forgot">("login");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -48,7 +59,9 @@ function LoginPageContent() {
   useEffect(() => {
     if (searchParams.get("join") === "1") {
       setTab("join");
-    } else if (
+      return;
+    }
+    if (
       searchParams.get("customer") === "1" ||
       isResetMode ||
       isMemberApp
@@ -65,6 +78,8 @@ function LoginPageContent() {
     if (nextTab === "join") {
       params.set("join", "1");
       params.delete("forgot");
+      // Join must not keep a bare customer=1-only signal that some flows treat as Member.
+      params.delete("customer");
     } else {
       params.delete("join");
     }
@@ -82,12 +97,6 @@ function LoginPageContent() {
     const qs = params.toString();
     router.replace(qs ? `/login?${qs}` : "/login", { scroll: false });
   }
-
-  useEffect(() => {
-    if (isMemberApp && tab === "staff") {
-      setTab("customer");
-    }
-  }, [isMemberApp, tab]);
 
   useEffect(() => {
     // Member app must never bounce to the staff dashboard.
