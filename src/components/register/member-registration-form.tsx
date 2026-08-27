@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { CheckCircle2, UserPlus } from "lucide-react";
 import { loyaltyConfig } from "@/config/loyalty";
@@ -28,11 +28,19 @@ export function MemberRegistrationForm({
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [acceptedPrivacy, setAcceptedPrivacy] = useState(false);
+  const [openPrivacyInNewTab, setOpenPrivacyInNewTab] = useState(true);
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [registeredCustomer, setRegisteredCustomer] = useState<Customer | null>(
     null
   );
+
+  useEffect(() => {
+    // Android WebView cannot usefully open/close a second tab for privacy.
+    setOpenPrivacyInNewTab(
+      !/CoffeesentialsCustomerApp/i.test(navigator.userAgent)
+    );
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -255,8 +263,9 @@ export function MemberRegistrationForm({
             I have read and agree to the{" "}
             <Link
               href="/privacy"
-              target="_blank"
-              rel="noopener noreferrer"
+              {...(openPrivacyInNewTab
+                ? { target: "_blank", rel: "noopener noreferrer" }
+                : {})}
               className="font-medium text-emerald-700 underline underline-offset-2 dark:text-emerald-400"
             >
               Data Privacy Agreement
