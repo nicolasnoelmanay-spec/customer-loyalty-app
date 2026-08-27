@@ -2,7 +2,6 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { KeyRound, Lock, Sparkles, UserPlus } from "lucide-react";
 import { AppHeader } from "@/components/app-header";
 import { CustomerForgotPasswordForm } from "@/components/customer/customer-forgot-password-form";
 import { CustomerLoginForm } from "@/components/customer/customer-login-form";
@@ -109,33 +108,26 @@ function LoginPageContent() {
     ? {
         title: "Reset Password",
         description: "Choose a new password for your member account.",
-        icon: KeyRound,
       }
     : tab === "staff"
     ? {
         title: "Staff Login",
         description: `Sign in to access the ${loyaltyConfig.programName} dashboard.`,
-        icon: Lock,
       }
     : tab === "customer"
       ? customerView === "forgot"
         ? {
             title: "Forgot Password",
             description: "We'll email you a link to reset your password.",
-            icon: KeyRound,
           }
         : {
             title: "Member Login",
             description: `Sign in with your member username and password.`,
-            icon: Sparkles,
           }
       : {
           title: "Member Registration",
           description: `Join ${loyaltyConfig.programName} to earn rewards on every visit.`,
-          icon: UserPlus,
         };
-
-  const HeaderIcon = headerCopy.icon;
 
   return (
     <>
@@ -143,11 +135,26 @@ function LoginPageContent() {
       <main className="flex flex-1 items-center justify-center px-4 py-12">
         <Card className="w-full max-w-lg">
           <CardHeader className="text-center">
-            <div className="mx-auto mb-2 flex size-12 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-950">
-              <HeaderIcon className="size-6 text-emerald-600" />
+            <div className="relative mx-auto mb-4 flex size-28 items-center justify-center sm:mb-5 sm:size-32">
+              <div
+                aria-hidden
+                className="absolute inset-2 rounded-full bg-amber-800/15 blur-2xl dark:bg-amber-400/20"
+              />
+              <div
+                aria-hidden
+                className="absolute inset-0 rounded-full bg-gradient-to-b from-amber-100/40 to-transparent dark:from-amber-50/10"
+              />
+              {/* eslint-disable-next-line @next/next/no-img-element -- preserve logo alpha without image optimizer cache */}
+              <img
+                src="/coffeesentials-mark.png"
+                alt="Coffeesentials"
+                width={128}
+                height={128}
+                className="relative size-24 object-contain drop-shadow-[0_8px_24px_rgba(60,30,10,0.28)] animate-in fade-in zoom-in-95 duration-500 sm:size-28 dark:drop-shadow-[0_8px_28px_rgba(0,0,0,0.55)]"
+              />
             </div>
-            <CardTitle>{headerCopy.title}</CardTitle>
-            <CardDescription>{headerCopy.description}</CardDescription>
+            <CardTitle className="text-2xl tracking-tight">{headerCopy.title}</CardTitle>
+            <CardDescription className="text-pretty">{headerCopy.description}</CardDescription>
           </CardHeader>
           <CardContent>
             {isResetMode ? (
