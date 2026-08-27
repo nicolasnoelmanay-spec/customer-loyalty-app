@@ -10,19 +10,32 @@ function isMemberWebViewApp(): boolean {
   return /CoffeesentialsCustomerApp/i.test(navigator.userAgent);
 }
 
+function registrationFallbackHref(searchParams: URLSearchParams): string {
+  const params = new URLSearchParams({ join: "1" });
+  if (searchParams.get("app") === "member" || isMemberWebViewApp()) {
+    params.set("app", "member");
+    params.set("customer", "1");
+  }
+  return `/login?${params.toString()}`;
+}
+
 function PrivacyBackToRegistrationButton() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
   function handleBack() {
-    // Always navigate explicitly — history.back() often returns to /login without
-    // join=1, which opens the Member tab instead of registration (esp. in the app).
-    const params = new URLSearchParams({ join: "1" });
-    if (searchParams.get("app") === "member" || isMemberWebViewApp()) {
-      params.set("app", "member");
-      params.set("customer", "1");
+    // Prefer the real previous page (same-tab privacy), not a fresh login navigation.
+    if (typeof window !== "undefined") {
+      if (window.opener && !window.opener.closed) {
+        window.close();
+        return;
+      }
+      if (window.history.length > 1) {
+        router.back();
+        return;
+      }
     }
-    router.push(`/login?${params.toString()}`);
+    router.push(registrationFallbackHref(searchParams));
   }
 
   return (

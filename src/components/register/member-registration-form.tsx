@@ -12,6 +12,57 @@ import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import type { Customer } from "@/types";
 
+const REGISTRATION_DRAFT_KEY = "coffeesentials-member-registration-draft";
+
+type RegistrationDraft = {
+  name: string;
+  phone: string;
+  email: string;
+  username: string;
+  password: string;
+  confirmPassword: string;
+  acceptedPrivacy: boolean;
+};
+
+function readRegistrationDraft(): RegistrationDraft | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = sessionStorage.getItem(REGISTRATION_DRAFT_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<RegistrationDraft>;
+    return {
+      name: typeof parsed.name === "string" ? parsed.name : "",
+      phone: typeof parsed.phone === "string" ? parsed.phone : "",
+      email: typeof parsed.email === "string" ? parsed.email : "",
+      username: typeof parsed.username === "string" ? parsed.username : "",
+      password: typeof parsed.password === "string" ? parsed.password : "",
+      confirmPassword:
+        typeof parsed.confirmPassword === "string" ? parsed.confirmPassword : "",
+      acceptedPrivacy: Boolean(parsed.acceptedPrivacy),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeRegistrationDraft(draft: RegistrationDraft): void {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.setItem(REGISTRATION_DRAFT_KEY, JSON.stringify(draft));
+  } catch {
+    // Ignore quota / private-mode failures.
+  }
+}
+
+function clearRegistrationDraft(): void {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.removeItem(REGISTRATION_DRAFT_KEY);
+  } catch {
+    // Ignore.
+  }
+}
+
 interface MemberRegistrationFormProps {
   embedded?: boolean;
   onLoginClick?: () => void;
@@ -28,7 +79,8 @@ export function MemberRegistrationForm({
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [acceptedPrivacy, setAcceptedPrivacy] = useState(false);
-  const [openPrivacyInNewTab, setOpenPrivacyInNewTab] = useState(true);
+  const [privacyHref, setPrivacyHref] = useState("/privacy?from=join");
+  const [draftReady, setDraftReady] = useState(false);
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [registeredCustomer, setRegisteredCustomer] = useState<Customer | null>(
@@ -36,11 +88,47 @@ export function MemberRegistrationForm({
   );
 
   useEffect(() => {
-    // Android WebView cannot usefully open/close a second tab for privacy.
-    setOpenPrivacyInNewTab(
-      !/CoffeesentialsCustomerApp/i.test(navigator.userAgent)
+    setPrivacyHref(
+      /CoffeesentialsCustomerApp/i.test(navigator.userAgent)
+        ? "/privacy?from=join&app=member"
+        : "/privacy?from=join"
     );
+
+    const draft = readRegistrationDraft();
+    if (draft) {
+      setName(draft.name);
+      setPhone(draft.phone);
+      setEmail(draft.email);
+      setUsername(draft.username);
+      setPassword(draft.password);
+      setConfirmPassword(draft.confirmPassword);
+      setAcceptedPrivacy(draft.acceptedPrivacy);
+    }
+    setDraftReady(true);
   }, []);
+
+  useEffect(() => {
+    if (!draftReady || registeredCustomer) return;
+    writeRegistrationDraft({
+      name,
+      phone,
+      email,
+      username,
+      password,
+      confirmPassword,
+      acceptedPrivacy,
+    });
+  }, [
+    draftReady,
+    registeredCustomer,
+    name,
+    phone,
+    email,
+    username,
+    password,
+    confirmPassword,
+    acceptedPrivacy,
+  ]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -76,6 +164,7 @@ export function MemberRegistrationForm({
         username: username.trim(),
         password,
       });
+      clearRegistrationDraft();
       setRegisteredCustomer(customer);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Registration failed.");
@@ -85,6 +174,7 @@ export function MemberRegistrationForm({
   }
 
   function handleRegisterAnother() {
+    clearRegistrationDraft();
     setRegisteredCustomer(null);
     setName("");
     setPhone("");
@@ -262,14 +352,7 @@ export function MemberRegistrationForm({
           <Label htmlFor="member-privacy" className="text-sm font-normal leading-snug">
             I have read and agree to the{" "}
             <Link
-              href={
-                openPrivacyInNewTab
-                  ? "/privacy?from=join"
-                  : "/privacy?from=join&app=member"
-              }
-              {...(openPrivacyInNewTab
-                ? { target: "_blank", rel: "noopener noreferrer" }
-                : {})}
+              href={privacyHref}
               className="font-medium text-emerald-700 underline underline-offset-2 dark:text-emerald-400"
             >
               Data Privacy Agreement

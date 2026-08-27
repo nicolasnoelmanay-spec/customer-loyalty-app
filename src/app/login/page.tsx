@@ -49,6 +49,12 @@ function LoginPageContent() {
     if (searchParams.get("join") === "1") {
       setTab("join");
     } else if (
+      typeof window !== "undefined" &&
+      sessionStorage.getItem("coffeesentials-member-registration-draft")
+    ) {
+      // Returning from privacy via history.back() may land on /login without join=1.
+      setTab("join");
+    } else if (
       searchParams.get("customer") === "1" ||
       isResetMode ||
       isMemberApp
