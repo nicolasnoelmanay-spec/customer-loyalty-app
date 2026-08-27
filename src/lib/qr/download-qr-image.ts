@@ -30,6 +30,20 @@ function isMobileShareDevice(): boolean {
   return isIosDevice() || isAndroidDevice();
 }
 
+type NativeQrBridge = {
+  saveQrImage: (dataUrl: string, fileName: string) => void;
+};
+
+/** Injected by Coffeesentials Android WebView shells. */
+function getNativeQrBridge(): NativeQrBridge | null {
+  if (typeof window === "undefined") return null;
+  const bridge = (
+    window as unknown as { CoffeesentialsApp?: NativeQrBridge }
+  ).CoffeesentialsApp;
+  if (!bridge || typeof bridge.saveQrImage !== "function") return null;
+  return bridge;
+}
+
 function createQrFile(dataUrl: string, fileName: string): File {
   const blob = dataUrlToBlob(dataUrl);
   return new File([blob], fileName, {
@@ -42,9 +56,11 @@ function createQrFile(dataUrl: string, fileName: string): File {
  * True when this device should use the native share sheet for QR images.
  * Desktop browsers often report canShare(files) but have no useful share
  * targets — keep those on a plain download path.
+ * Android WebView apps use a native bridge instead (share is unreliable there).
  */
 export function canShareQrImage(): boolean {
   if (typeof navigator === "undefined") return false;
+  if (getNativeQrBridge()) return false;
   if (!isMobileShareDevice()) return false;
   if (typeof navigator.share !== "function") return false;
   if (typeof navigator.canShare !== "function") return false;
@@ -75,18 +91,25 @@ function openQrImageForSave(dataUrl: string): void {
   // after an async share attempt, and get revoked too early.
   const opened = window.open(dataUrl, "_blank");
   if (!opened) {
-    // Popup blocked: navigate this tab so the user can long-press Save Image.
+    // Popup blocked (common in Android WebView): show the image in this tab
+    // so the user can long-press → Save image / Share.
     window.location.assign(dataUrl);
   }
 }
 
 function fallbackSaveQrImage(dataUrl: string, fileName: string): void {
-  triggerDataUrlDownload(dataUrl, fileName);
-
-  // iOS ignores the download attribute — open the image for long-press save.
-  if (isIosDevice()) {
+  // Android Chrome and WebView usually ignore <a download> for data: URLs.
+  // iOS also ignores download — open the image for long-press save.
+  if (isAndroidDevice() || isIosDevice()) {
+    if (isAndroidDevice()) {
+      // Best-effort: some WebViews fire a download listener for this click.
+      triggerDataUrlDownload(dataUrl, fileName);
+    }
     openQrImageForSave(dataUrl);
+    return;
   }
+
+  triggerDataUrlDownload(dataUrl, fileName);
 }
 
 export async function downloadQrImage(
@@ -95,6 +118,12 @@ export async function downloadQrImage(
 ): Promise<void> {
   if (!dataUrl.startsWith("data:image/")) {
     throw new Error("QR image is not ready yet.");
+  }
+
+  const nativeBridge = getNativeQrBridge();
+  if (nativeBridge) {
+    nativeBridge.saveQrImage(dataUrl, fileName);
+    return;
   }
 
   if (canShareQrImage()) {
@@ -122,16 +151,21 @@ export async function downloadQrImage(
 }
 
 export function getQrDownloadButtonLabel(): string {
+  if (getNativeQrBridge()) return "Download QR Code";
   return canShareQrImage() ? "Save or Share QR Code" : "Download QR Code";
 }
 
 export function getQrDownloadHint(): string | null {
+  if (getNativeQrBridge()) {
+    return "Saves the QR code to your Pictures folder.";
+  }
+
   if (canShareQrImage()) {
     return "Choose Save Image (or Photos) from the share menu.";
   }
 
-  if (isIosDevice()) {
-    return "Opens the QR image. Press and hold it, then choose Save Image.";
+  if (isIosDevice() || isAndroidDevice()) {
+    return "Opens the QR image. Press and hold it, then choose Save image.";
   }
 
   return null;
