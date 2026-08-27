@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Gift, LogOut, Menu } from "lucide-react";
 import { loyaltyConfig } from "@/config/loyalty";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -15,6 +15,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/hooks/use-auth";
+import { useCustomerAuth } from "@/hooks/use-customer-auth";
 import { cn } from "@/lib/utils";
 
 interface AppHeaderProps {
@@ -47,11 +48,13 @@ function isMemberWebViewApp(): boolean {
 
 export function AppHeader({ active }: AppHeaderProps) {
   const { isReady, isAuthenticated, logout } = useAuth();
+  const { isAuthenticated: isCustomerAuthenticated } = useCustomerAuth();
+  const pathname = usePathname();
   const router = useRouter();
-  const [hideBrand, setHideBrand] = useState(false);
+  const [isMemberApp, setIsMemberApp] = useState(false);
 
   useEffect(() => {
-    setHideBrand(isMemberWebViewApp());
+    setIsMemberApp(isMemberWebViewApp());
   }, []);
 
   async function handleLogout() {
@@ -69,6 +72,16 @@ export function AppHeader({ active }: AppHeaderProps) {
       active === "expenses" ||
       active === "summary" ||
       active === "lookup");
+
+  const isCustomerSurface =
+    pathname === "/login" ||
+    pathname === "/privacy" ||
+    pathname === "/customer" ||
+    pathname.startsWith("/customer/");
+
+  const hideBrand =
+    !showStaffNav &&
+    (isMemberApp || isCustomerAuthenticated || isCustomerSurface);
 
   return (
     <header className="sticky top-0 z-50 border-b bg-background/80 backdrop-blur-md">
