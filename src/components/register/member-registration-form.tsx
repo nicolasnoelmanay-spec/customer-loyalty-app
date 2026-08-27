@@ -262,7 +262,11 @@ export function MemberRegistrationForm({
           <Label htmlFor="member-privacy" className="text-sm font-normal leading-snug">
             I have read and agree to the{" "}
             <Link
-              href="/privacy"
+              href={
+                openPrivacyInNewTab
+                  ? "/privacy?from=join"
+                  : "/privacy?from=join&app=member"
+              }
               {...(openPrivacyInNewTab
                 ? { target: "_blank", rel: "noopener noreferrer" }
                 : {})}
