@@ -49,12 +49,6 @@ function LoginPageContent() {
     if (searchParams.get("join") === "1") {
       setTab("join");
     } else if (
-      typeof window !== "undefined" &&
-      sessionStorage.getItem("coffeesentials-member-registration-draft")
-    ) {
-      // Returning from privacy via history.back() may land on /login without join=1.
-      setTab("join");
-    } else if (
       searchParams.get("customer") === "1" ||
       isResetMode ||
       isMemberApp
@@ -65,6 +59,29 @@ function LoginPageContent() {
       setCustomerView("forgot");
     }
   }, [searchParams, isResetMode, isMemberApp]);
+
+  function syncLoginTabInUrl(nextTab: LoginTab) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (nextTab === "join") {
+      params.set("join", "1");
+      params.delete("forgot");
+    } else {
+      params.delete("join");
+    }
+    if (nextTab === "customer") {
+      params.set("customer", "1");
+    } else if (nextTab === "staff") {
+      params.delete("customer");
+    }
+    if (isMemberApp) {
+      params.set("app", "member");
+      if (nextTab === "customer") {
+        params.set("customer", "1");
+      }
+    }
+    const qs = params.toString();
+    router.replace(qs ? `/login?${qs}` : "/login", { scroll: false });
+  }
 
   useEffect(() => {
     if (isMemberApp && tab === "staff") {
@@ -170,10 +187,12 @@ function LoginPageContent() {
               value={tab}
               onValueChange={(value) => {
                 if (isMemberApp && value === "staff") return;
-                setTab(value as LoginTab);
-                if (value === "customer") {
+                const nextTab = value as LoginTab;
+                setTab(nextTab);
+                if (nextTab === "customer") {
                   setCustomerView("login");
                 }
+                syncLoginTabInUrl(nextTab);
               }}
             >
               <TabsList
@@ -236,7 +255,10 @@ function LoginPageContent() {
                 ) : (
                   <CustomerLoginForm
                     embedded
-                    onJoinClick={() => setTab("join")}
+                    onJoinClick={() => {
+                      setTab("join");
+                      syncLoginTabInUrl("join");
+                    }}
                     onForgotClick={() => setCustomerView("forgot")}
                   />
                 )}
