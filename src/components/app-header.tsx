@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Gift, LogOut, Menu } from "lucide-react";
@@ -39,9 +40,19 @@ const staffLinks = [
   { href: "/lookup", label: "Customer Lookup", key: "lookup" as const },
 ];
 
+function isMemberWebViewApp(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return /CoffeesentialsCustomerApp/i.test(navigator.userAgent);
+}
+
 export function AppHeader({ active }: AppHeaderProps) {
   const { isReady, isAuthenticated, logout } = useAuth();
   const router = useRouter();
+  const [hideBrand, setHideBrand] = useState(false);
+
+  useEffect(() => {
+    setHideBrand(isMemberWebViewApp());
+  }, []);
 
   async function handleLogout() {
     await logout();
@@ -62,12 +73,16 @@ export function AppHeader({ active }: AppHeaderProps) {
   return (
     <header className="sticky top-0 z-50 border-b bg-background/80 backdrop-blur-md">
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-3 px-4 sm:px-6">
-        <Link href="/" className="flex min-w-0 items-center gap-2 font-semibold tracking-tight">
-          <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-emerald-600 text-white">
-            <Gift className="size-4" />
-          </span>
-          <span className="truncate hidden sm:inline">{loyaltyConfig.programName}</span>
-        </Link>
+        {hideBrand ? (
+          <div className="min-w-0 flex-1" aria-hidden />
+        ) : (
+          <Link href="/" className="flex min-w-0 items-center gap-2 font-semibold tracking-tight">
+            <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-emerald-600 text-white">
+              <Gift className="size-4" />
+            </span>
+            <span className="truncate hidden sm:inline">{loyaltyConfig.programName}</span>
+          </Link>
+        )}
 
         <nav className="flex shrink-0 items-center gap-1 sm:gap-2">
           {showStaffNav && (
