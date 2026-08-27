@@ -41,23 +41,39 @@ function LoginPageContent() {
   const [error, setError] = useState("");
   const resetToken = searchParams.get("token")?.trim() ?? "";
   const isResetMode = searchParams.get("reset") === "1" && resetToken.length > 0;
+  const isMemberApp =
+    searchParams.get("app") === "member" ||
+    (typeof navigator !== "undefined" &&
+      /CoffeesentialsCustomerApp/i.test(navigator.userAgent));
 
   useEffect(() => {
     if (searchParams.get("join") === "1") {
       setTab("join");
-    } else if (searchParams.get("customer") === "1" || isResetMode) {
+    } else if (
+      searchParams.get("customer") === "1" ||
+      isResetMode ||
+      isMemberApp
+    ) {
       setTab("customer");
     }
     if (searchParams.get("forgot") === "1") {
       setCustomerView("forgot");
     }
-  }, [searchParams, isResetMode]);
+  }, [searchParams, isResetMode, isMemberApp]);
 
   useEffect(() => {
+    if (isMemberApp && tab === "staff") {
+      setTab("customer");
+    }
+  }, [isMemberApp, tab]);
+
+  useEffect(() => {
+    // Member app must never bounce to the staff dashboard.
+    if (isMemberApp) return;
     if (staffReady && staffAuthenticated) {
       router.replace("/dashboard");
     }
-  }, [staffReady, staffAuthenticated, router]);
+  }, [isMemberApp, staffReady, staffAuthenticated, router]);
 
   useEffect(() => {
     if (customerReady && customerAuthenticated && tab === "customer") {
@@ -76,7 +92,16 @@ function LoginPageContent() {
     }
   }
 
-  if (!staffReady || staffAuthenticated) {
+  // Staff sessions blank this page while redirecting — skip that in the member app.
+  if (isMemberApp) {
+    if (!customerReady || (customerAuthenticated && tab === "customer")) {
+      return (
+        <main className="flex flex-1 items-center justify-center px-4 py-12">
+          <p className="text-sm text-muted-foreground">Loading…</p>
+        </main>
+      );
+    }
+  } else if (!staffReady || staffAuthenticated) {
     return null;
   }
 
@@ -100,7 +125,7 @@ function LoginPageContent() {
             icon: KeyRound,
           }
         : {
-            title: "Customer Login",
+            title: "Member Login",
             description: `Sign in with your member username and password.`,
             icon: Sparkles,
           }
@@ -131,17 +156,27 @@ function LoginPageContent() {
             <Tabs
               value={tab}
               onValueChange={(value) => {
+                if (isMemberApp && value === "staff") return;
                 setTab(value as LoginTab);
                 if (value === "customer") {
                   setCustomerView("login");
                 }
               }}
             >
-              <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="staff">Staff</TabsTrigger>
-                <TabsTrigger value="customer">Customer</TabsTrigger>
+              <TabsList
+                className={
+                  isMemberApp
+                    ? "grid w-full grid-cols-2"
+                    : "grid w-full grid-cols-3"
+                }
+              >
+                {!isMemberApp && (
+                  <TabsTrigger value="staff">Staff</TabsTrigger>
+                )}
+                <TabsTrigger value="customer">Member</TabsTrigger>
                 <TabsTrigger value="join">Join</TabsTrigger>
               </TabsList>
+              {!isMemberApp && (
               <TabsContent value="staff" className="mt-4">
                 <form
                   onSubmit={handleStaffSubmit}
@@ -178,6 +213,7 @@ function LoginPageContent() {
                   </Button>
                 </form>
               </TabsContent>
+              )}
               <TabsContent value="customer" className="mt-4">
                 {customerView === "forgot" ? (
                   <CustomerForgotPasswordForm
